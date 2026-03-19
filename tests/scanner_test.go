@@ -32,15 +32,15 @@ func TestRunScan(t *testing.T) {
 		t.Fatalf("Expected leaks to be found, got 0")
 	}
 
-	foundFirebase := false
+	foundGoogle := false
 	foundGeneric := false
 	foundImportMeta := false
 	foundAWS := false
 
 	for _, l := range leaks {
 		switch l.LeakType {
-		case models.LeakTypeFirebaseKey:
-			foundFirebase = true
+		case models.LeakTypeGoogleKey:
+			foundGoogle = true
 		case models.LeakTypeGenericSec:
 			foundGeneric = true
 		case models.LeakTypeImportMeta:
@@ -50,8 +50,8 @@ func TestRunScan(t *testing.T) {
 		}
 	}
 
-	if !foundFirebase {
-		t.Errorf("Expected to find FIREBASE_API_KEY leak in synthetic payload")
+	if !foundGoogle {
+		t.Errorf("Expected to find GOOGLE_API_KEY leak in synthetic payload")
 	}
 	if !foundGeneric {
 		t.Errorf("Expected to find GENERIC_SECRET_KEY leak in synthetic payload")
