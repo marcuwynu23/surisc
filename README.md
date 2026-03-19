@@ -114,3 +114,17 @@ For JSON output:
 ```sh
 podman run --rm surisc -u https://example.com -o json
 ```
+
+### Using GitHub Container Registry (GHCR)
+
+You can also run SuriSC directly from the GitHub Container Registry without needing to build it locally.
+
+**Run using Docker**:
+```sh
+docker run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com
+```
+
+**Run using Podman**:
+```sh
+podman run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com
+```
