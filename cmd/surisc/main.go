@@ -44,9 +44,10 @@ func main() {
 			if insight.Backend != "" { fmt.Printf("- Backend: %s\n", insight.Backend) }
 			if insight.Frontend != "" { fmt.Printf("- Frontend: %s\n", insight.Frontend) }
 			if insight.Server != "" { fmt.Printf("- Server: %s\n", insight.Server) }
+			if insight.Protocol != "" { fmt.Printf("- Protocol: %s\n", insight.Protocol) }
 			if insight.CDNWAF != "" { fmt.Printf("- CDN/WAF: %s\n", insight.CDNWAF) }
 			if insight.CMS != "" { fmt.Printf("- CMS: %s\n", insight.CMS) }
-			if insight.Backend == "" && insight.Frontend == "" && insight.Server == "" && insight.CDNWAF == "" && insight.CMS == "" {
+			if insight.Backend == "" && insight.Frontend == "" && insight.Server == "" && insight.CDNWAF == "" && insight.CMS == "" && insight.Protocol == "" {
 				fmt.Println("- No technology insights detected.")
 			}
 			fmt.Println(strings.Repeat("-", 80))

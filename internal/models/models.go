@@ -37,4 +37,5 @@ type TechInsight struct {
 	Server   string `json:"server,omitempty"`
 	CDNWAF   string `json:"cdn_waf,omitempty"`
 	CMS      string `json:"cms,omitempty"`
+	Protocol string `json:"protocol,omitempty"`
 }
