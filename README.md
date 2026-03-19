@@ -65,7 +65,7 @@ SuriSC can be executed directly from the terminal and supports both raw console 
 ```text
 SuriSC Completed. Results:
 --------------------------------------------------------------------------------
-[!]     [FIREBASE_API_KEY]
+[!]     [GOOGLE_API_KEY]
         [SOURCE_URL]: https://example.com/assets/index.js
         [GRAVITY_SCORE]: 9.00
         [SNIPPET]: AIzaSyBLT...
