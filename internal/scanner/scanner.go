@@ -14,6 +14,16 @@ import (
 var (
 	// Regex Patterns
 	rxFirebaseKey      = regexp.MustCompile(`AIza[0-9A-Za-z-_]{35}`)
+	rxAWSKey           = regexp.MustCompile(`AKIA[0-9A-Z]{16}`)
+	rxStripeKey        = regexp.MustCompile(`[rs]k_live_[0-9a-zA-Z]{24,}`)
+	rxGitHubToken      = regexp.MustCompile(`ghp_[0-9a-zA-Z]{36}`)
+	rxSlackToken       = regexp.MustCompile(`xox[baprs]-[0-9a-zA-Z]{10,48}`)
+	rxGitLabToken      = regexp.MustCompile(`glpat-[0-9a-zA-Z\-]{20}`)
+	rxSendGridKey      = regexp.MustCompile(`SG\.[a-zA-Z0-9_\-\.]{43,}`)
+	rxMailgunKey       = regexp.MustCompile(`key-[0-9a-zA-Z]{32}`)
+	rxTwilioKey        = regexp.MustCompile(`(?:SK|AC)[a-z0-9]{32}`)
+	rxSquareToken      = regexp.MustCompile(`sq0[a-z]{3}-[0-9A-Za-z\-_]{22,43}`)
+	rxRSAPrivate       = regexp.MustCompile(`-----BEGIN (?:RSA|DSA|EC|OPENSSH)? PRIVATE KEY-----`)
 	rxMapFile          = regexp.MustCompile(`sourceMappingURL=.*\.map`)
 	rxBearerToken      = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9\-\._~\+\/]+=*`)
 	rxInternalIP       = regexp.MustCompile(`(?:10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)`)
@@ -96,6 +106,100 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 				LeakType:     models.LeakTypeFirebaseKey,
 				SourceURL:    sourceURL,
 				GravityScore: 9.0,
+				Snippet:      string(m),
+			})
+		}
+	}
+
+	// 1.1 AWS Access Keys
+	if matches := rxAWSKey.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{
+				LeakType:     models.LeakTypeAWSKey,
+				SourceURL:    sourceURL,
+				GravityScore: 10.0,
+				Snippet:      string(m),
+			})
+		}
+	}
+
+	// 1.2 Stripe Secret Keys
+	if matches := rxStripeKey.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{
+				LeakType:     models.LeakTypeStripeKey,
+				SourceURL:    sourceURL,
+				GravityScore: 10.0,
+				Snippet:      string(m),
+			})
+		}
+	}
+
+	// 1.3 GitHub PATs
+	if matches := rxGitHubToken.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{
+				LeakType:     models.LeakTypeGitHubToken,
+				SourceURL:    sourceURL,
+				GravityScore: 10.0,
+				Snippet:      string(m),
+			})
+		}
+	}
+
+	// 1.4 Slack Tokens
+	if matches := rxSlackToken.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{
+				LeakType:     models.LeakTypeSlackToken,
+				SourceURL:    sourceURL,
+				GravityScore: 9.5,
+				Snippet:      string(m),
+			})
+		}
+	}
+
+	// 1.5 GitLab PATs
+	if matches := rxGitLabToken.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{
+				LeakType:     models.LeakTypeGitLabToken,
+				SourceURL:    sourceURL,
+				GravityScore: 10.0,
+				Snippet:      string(m),
+			})
+		}
+	}
+
+	// 1.6 SendGrid, Mailgun, Twilio, Square
+	if matches := rxSendGridKey.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeSendGridKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: string(m)})
+		}
+	}
+	if matches := rxMailgunKey.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeMailgunKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: string(m)})
+		}
+	}
+	if matches := rxTwilioKey.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeTwilioKey, SourceURL: sourceURL, GravityScore: 9.5, Snippet: string(m)})
+		}
+	}
+	if matches := rxSquareToken.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeSquareToken, SourceURL: sourceURL, GravityScore: 10.0, Snippet: string(m)})
+		}
+	}
+
+	// 1.7 RSA Private Keys
+	if matches := rxRSAPrivate.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{
+				LeakType:     models.LeakTypeRSAPrivate,
+				SourceURL:    sourceURL,
+				GravityScore: 10.0,
 				Snippet:      string(m),
 			})
 		}

@@ -16,6 +16,7 @@ func TestRunScan(t *testing.T) {
 		w.Header().Set("Content-Type", "application/javascript")
 		fmt.Fprintln(w, `
 			var apiKey = "AIzaSyCXwabcde1234567890fghijkLMNOPQrsX";
+			var awsKey = "AKIAIOSFODNN7EXAMPLE";
 			var mySecret = "THIS_IS_A_VERY_LONG_SECRET_STRING_DO_NOT_SHARE";
 			// Should be ignored due to length and lack of assignment entropy
 			var normalVal = "password"; 
@@ -34,6 +35,7 @@ func TestRunScan(t *testing.T) {
 	foundFirebase := false
 	foundGeneric := false
 	foundImportMeta := false
+	foundAWS := false
 
 	for _, l := range leaks {
 		switch l.LeakType {
@@ -43,6 +45,8 @@ func TestRunScan(t *testing.T) {
 			foundGeneric = true
 		case models.LeakTypeImportMeta:
 			foundImportMeta = true
+		case models.LeakTypeAWSKey:
+			foundAWS = true
 		}
 	}
 
@@ -54,5 +58,8 @@ func TestRunScan(t *testing.T) {
 	}
 	if !foundImportMeta {
 		t.Errorf("Expected to find IMPORT_META_LEAK leak in synthetic payload")
+	}
+	if !foundAWS {
+		t.Errorf("Expected to find AWS_ACCESS_KEY leak in synthetic payload")
 	}
 }
