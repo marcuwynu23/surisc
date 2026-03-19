@@ -21,6 +21,7 @@ var (
 	rxGitLabToken      = regexp.MustCompile(`glpat-[0-9a-zA-Z\-]{20}`)
 	rxSendGridKey      = regexp.MustCompile(`SG\.[a-zA-Z0-9_\-\.]{43,}`)
 	rxMailgunKey       = regexp.MustCompile(`key-[0-9a-zA-Z]{32}`)
+	rxResendKey        = regexp.MustCompile(`re_[a-zA-Z0-9]{24}`)
 	rxTwilioKey        = regexp.MustCompile(`(?:SK|AC)[a-z0-9]{32}`)
 	rxSquareToken      = regexp.MustCompile(`sq0[a-z]{3}-[0-9A-Za-z\-_]{22,43}`)
 	rxRSAPrivate       = regexp.MustCompile(`-----BEGIN (?:RSA|DSA|EC|OPENSSH)? PRIVATE KEY-----`)
@@ -171,7 +172,7 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 		}
 	}
 
-	// 1.6 SendGrid, Mailgun, Twilio, Square
+	// 1.6 SendGrid, Mailgun, Resend, Twilio, Square
 	if matches := rxSendGridKey.FindAll(content, -1); matches != nil {
 		for _, m := range matches {
 			localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeSendGridKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: string(m)})
@@ -180,6 +181,11 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 	if matches := rxMailgunKey.FindAll(content, -1); matches != nil {
 		for _, m := range matches {
 			localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeMailgunKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: string(m)})
+		}
+	}
+	if matches := rxResendKey.FindAll(content, -1); matches != nil {
+		for _, m := range matches {
+			localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeResendKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: string(m)})
 		}
 	}
 	if matches := rxTwilioKey.FindAll(content, -1); matches != nil {

@@ -18,6 +18,7 @@ const (
 	LeakTypeGitLabToken LeakType = "GITLAB_PAT"
 	LeakTypeSendGridKey LeakType = "SENDGRID_API_KEY"
 	LeakTypeMailgunKey  LeakType = "MAILGUN_API_KEY"
+	LeakTypeResendKey   LeakType = "RESEND_API_KEY"
 	LeakTypeTwilioKey   LeakType = "TWILIO_API_KEY"
 	LeakTypeSquareToken LeakType = "SQUARE_ACCESS_TOKEN"
 	LeakTypeRSAPrivate  LeakType = "RSA_PRIVATE_KEY"

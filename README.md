@@ -20,11 +20,11 @@ Written in Go, it operates entirely in memory to scrape, parse, and analyze Java
   - Stripe Secret Keys (`sk_live_...`)
   - GitHub Personal Access Tokens (`ghp_...`)
   - GitLab Personal Access Tokens (`glpat-...`)
-  - Mail Service API Keys (SendGrid, Mailgun)
+  - Mail Service API Keys (SendGrid, Mailgun, Resend)
   - Payment & Gateway Tokens (Square, Twilio)
   - RSA Private Keys headers (`-----BEGIN PRIVATE KEY...`)
   - Slack API Tokens (`xoxb-...`)
-  - Google Firebase API Keys
+  - Google API Keys
   - Exposed map file dependencies (`.map`)
   - `Bearer` authentication tokens
   - Internal IP address ranges (`10.x`, `172.16.x`, `192.168.x`)

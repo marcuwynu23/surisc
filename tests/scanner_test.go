@@ -18,6 +18,7 @@ func TestRunScan(t *testing.T) {
 			var apiKey = "AIzaSyCXwabcde1234567890fghijkLMNOPQrsX";
 			var awsKey = "AKIAIOSFODNN7EXAMPLE";
 			var mySecret = "THIS_IS_A_VERY_LONG_SECRET_STRING_DO_NOT_SHARE";
+			var resendKey = "re_1234567890abcdef12345678";
 			// Should be ignored due to length and lack of assignment entropy
 			var normalVal = "password"; 
 			var importRef = import.meta.env.SUPER_SECRET_TOKEN;
@@ -36,6 +37,7 @@ func TestRunScan(t *testing.T) {
 	foundGeneric := false
 	foundImportMeta := false
 	foundAWS := false
+	foundResend := false
 
 	for _, l := range leaks {
 		switch l.LeakType {
@@ -47,9 +49,14 @@ func TestRunScan(t *testing.T) {
 			foundImportMeta = true
 		case models.LeakTypeAWSKey:
 			foundAWS = true
+		case models.LeakTypeResendKey:
+			foundResend = true
 		}
 	}
 
+	if !foundResend {
+		t.Errorf("Expected to find RESEND_API_KEY leak in synthetic payload")
+	}
 	if !foundGoogle {
 		t.Errorf("Expected to find GOOGLE_API_KEY leak in synthetic payload")
 	}
