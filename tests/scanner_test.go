@@ -27,7 +27,7 @@ func TestRunScan(t *testing.T) {
 	defer ts.Close()
 
 	// Execute Scan
-	leaks := scanner.RunScan(ts.URL)
+	leaks, _ := scanner.RunScan(ts.URL, false)
 
 	if len(leaks) == 0 {
 		t.Fatalf("Expected leaks to be found, got 0")

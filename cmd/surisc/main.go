@@ -13,22 +13,46 @@ import (
 func main() {
 	targetURL := flag.String("u", "", "Target URL to scan")
 	outputFormat := flag.String("o", "hud", "Output format (hud|json)")
+	informative := flag.Bool("i", false, "Enable informative technology stack detection")
 	flag.Parse()
 
 	if *targetURL == "" {
 		log.Fatal("Please provide a target URL using the -u flag.")
 	}
 
-	leaks := scanner.RunScan(*targetURL)
+	leaks, insight := scanner.RunScan(*targetURL, *informative)
 
 	if *outputFormat == "json" {
-		b, err := json.MarshalIndent(leaks, "", "  ")
-		if err != nil {
-			log.Fatalf("Failed to marshal json: %v", err)
+		if *informative {
+			b, err := json.MarshalIndent(insight, "", "  ")
+			if err != nil {
+				log.Fatalf("Failed to marshal json: %v", err)
+			}
+			fmt.Println(string(b))
+		} else {
+			b, err := json.MarshalIndent(leaks, "", "  ")
+			if err != nil {
+				log.Fatalf("Failed to marshal json: %v", err)
+			}
+			fmt.Println(string(b))
 		}
-		fmt.Println(string(b))
 	} else {
 		// HUD Output
+		if *informative {
+			fmt.Println("\n🛰️  Surisc Informative Target Analysis:")
+			fmt.Println(strings.Repeat("-", 80))
+			if insight.Backend != "" { fmt.Printf("- Backend: %s\n", insight.Backend) }
+			if insight.Frontend != "" { fmt.Printf("- Frontend: %s\n", insight.Frontend) }
+			if insight.Server != "" { fmt.Printf("- Server: %s\n", insight.Server) }
+			if insight.CDNWAF != "" { fmt.Printf("- CDN/WAF: %s\n", insight.CDNWAF) }
+			if insight.CMS != "" { fmt.Printf("- CMS: %s\n", insight.CMS) }
+			if insight.Backend == "" && insight.Frontend == "" && insight.Server == "" && insight.CDNWAF == "" && insight.CMS == "" {
+				fmt.Println("- No technology insights detected.")
+			}
+			fmt.Println(strings.Repeat("-", 80))
+			return
+		}
+
 		fmt.Println("\n🛰️  Surisc Completed. Results:")
 		fmt.Println(strings.Repeat("-", 80))
 		if len(leaks) == 0 {
