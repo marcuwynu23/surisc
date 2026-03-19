@@ -1,6 +1,14 @@
-# SuriSC
+<div align="center">
+  <h1>surisc</h1>
 
-SuriSC is a high-performance reconnaissance tool built specifically for **frontend web security**. Written in Go, it operates entirely in memory to scrape, parse, and analyze JavaScript bundles from target URLs, proactively hunting for leaked API keys, hardcoded credentials, and exposed environment variables.
+  ![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)
+  ![Security](https://img.shields.io/badge/Security-Reconnaissance-red?style=flat)
+  ![Status](https://img.shields.io/badge/Status-Active-success?style=flat)
+
+  <p><strong>A high-performance reconnaissance tool built specifically for frontend web security.</strong></p>
+</div>
+
+Written in Go, it operates entirely in memory to scrape, parse, and analyze JavaScript bundles from target URLs, proactively hunting for leaked API keys, hardcoded credentials, and exposed environment variables.
 
 ## Features
 
