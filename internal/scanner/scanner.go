@@ -36,7 +36,7 @@ var (
 	rxPotentialSecret  = regexp.MustCompile(`["'][A-Za-z0-9/+=]{20,}["']`)
 )
 
-func RunScan(targetURL string) []models.Leak {
+func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.TechInsight) {
 	c := colly.NewCollector(
 		colly.Async(true),
 	)
@@ -54,7 +54,9 @@ func RunScan(targetURL string) []models.Leak {
 	})
 
 	var leaks []models.Leak
+	var insight models.TechInsight
 	var leaksMutex sync.Mutex
+	var insightMutex sync.Mutex
 	var wg sync.WaitGroup
 
 	err := c.Limit(&colly.LimitRule{
@@ -66,10 +68,38 @@ func RunScan(targetURL string) []models.Leak {
 		log.Fatalf("Failed to set limit rule: %v", err)
 	}
 
+	// Technical Insights: CMS and Frontend Check
+	c.OnHTML("meta[name=generator]", func(e *colly.HTMLElement) {
+		insightMutex.Lock()
+		defer insightMutex.Unlock()
+		insight.CMS = e.Attr("content")
+	})
+
+	c.OnHTML("div[id=__next]", func(e *colly.HTMLElement) {
+		insightMutex.Lock()
+		defer insightMutex.Unlock()
+		insight.Frontend = "React (Next.js)"
+	})
+
 	// Intercept inline scripts and <script src="...">
 	c.OnHTML("script", func(e *colly.HTMLElement) {
 		src := e.Attr("src")
-		if src == "" {
+
+		// Tech Insights from script paths
+		if src != "" {
+			insightMutex.Lock()
+			if strings.Contains(src, "/_next/") {
+				insight.Frontend = "React (Next.js)"
+			} else if strings.Contains(src, "/_nuxt/") {
+				insight.Frontend = "Vue.js (Nuxt)"
+			} else if strings.Contains(src, "wp-includes") || strings.Contains(src, "wp-content") {
+				insight.CMS = "WordPress"
+				insight.Backend = "PHP (WordPress)"
+			}
+			insightMutex.Unlock()
+		}
+
+		if src == "" && !informativeOnly {
 			// Inline script
 			content := e.Text
 			wg.Add(1)
@@ -77,7 +107,7 @@ func RunScan(targetURL string) []models.Leak {
 				defer wg.Done()
 				analyzeContent(e.Request.URL.String(), []byte(content), &leaks, &leaksMutex)
 			}()
-		} else {
+		} else if src != "" && !informativeOnly {
 			// External script
 			absURL := e.Request.AbsoluteURL(src)
 			if absURL != "" {
@@ -86,10 +116,29 @@ func RunScan(targetURL string) []models.Leak {
 		}
 	})
 
-	// Process JS responses
+	// Process JS responses and global headers
 	c.OnResponse(func(r *colly.Response) {
+		// Tech Insights from Headers
+		insightMutex.Lock()
+		if insight.Server == "" && r.Headers.Get("Server") != "" {
+			insight.Server = r.Headers.Get("Server")
+		}
+		if insight.Backend == "" {
+			if powered := r.Headers.Get("X-Powered-By"); powered != "" {
+				insight.Backend = powered
+			}
+		}
+		if insight.CDNWAF == "" {
+			if r.Headers.Get("CF-Ray") != "" {
+				insight.CDNWAF = "Cloudflare"
+			} else if via := r.Headers.Get("Via"); via != "" {
+				insight.CDNWAF = "Via: " + via
+			}
+		}
+		insightMutex.Unlock()
+
 		ctype := r.Headers.Get("Content-Type")
-		if strings.Contains(ctype, "javascript") || strings.Contains(ctype, "json") || strings.HasSuffix(r.Request.URL.Path, ".js") {
+		if !informativeOnly && (strings.Contains(ctype, "javascript") || strings.Contains(ctype, "json") || strings.HasSuffix(r.Request.URL.Path, ".js")) {
 			content := make([]byte, len(r.Body))
 			copy(content, r.Body) // Copy to isolate from colly internal buffers
 			wg.Add(1)
@@ -109,7 +158,7 @@ func RunScan(targetURL string) []models.Leak {
 	c.Wait()
 	wg.Wait()
 
-	return leaks
+	return leaks, insight
 }
 
 func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mutex *sync.Mutex) {
