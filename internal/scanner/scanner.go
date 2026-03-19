@@ -13,7 +13,7 @@ import (
 
 var (
 	// Regex Patterns
-	rxFirebaseKey      = regexp.MustCompile(`AIza[0-9A-Za-z-_]{35}`)
+	rxGoogleKey        = regexp.MustCompile(`AIza[0-9A-Za-z-_]{35}`)
 	rxAWSKey           = regexp.MustCompile(`AKIA[0-9A-Z]{16}`)
 	rxStripeKey        = regexp.MustCompile(`[rs]k_live_[0-9a-zA-Z]{24,}`)
 	rxGitHubToken      = regexp.MustCompile(`ghp_[0-9a-zA-Z]{36}`)
@@ -99,11 +99,11 @@ func RunScan(targetURL string) []models.Leak {
 func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mutex *sync.Mutex) {
 	var localLeaks []models.Leak
 
-	// 1. Firebase API Key
-	if matches := rxFirebaseKey.FindAll(content, -1); matches != nil {
+	// 1. Google API Key
+	if matches := rxGoogleKey.FindAll(content, -1); matches != nil {
 		for _, m := range matches {
 			localLeaks = append(localLeaks, models.Leak{
-				LeakType:     models.LeakTypeFirebaseKey,
+				LeakType:     models.LeakTypeGoogleKey,
 				SourceURL:    sourceURL,
 				GravityScore: 9.0,
 				Snippet:      string(m),

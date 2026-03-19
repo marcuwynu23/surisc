@@ -5,7 +5,7 @@ type LeakType string
 
 const (
 	LeakTypeHighEntropy LeakType = "HIGH_ENTROPY_SECRET"
-	LeakTypeFirebaseKey LeakType = "FIREBASE_API_KEY"
+	LeakTypeGoogleKey   LeakType = "GOOGLE_API_KEY"
 	LeakTypeMapFile     LeakType = "MAP_FILE_REFERENCE"
 	LeakTypeBearerToken LeakType = "BEARER_TOKEN"
 	LeakTypeInternalIP  LeakType = "INTERNAL_IP_ADDRESS"
