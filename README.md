@@ -71,7 +71,7 @@ SuriSC can be executed directly from the terminal and supports both raw console 
 ```
 
 ### Informative Target Analysis (Technology Stack Detection)
-The `-i` flag skips the secret scan and focuses solely on extracting infrastructure insights such as the Backend, Frontend, Server, and CDN/WAF.
+The `-i` flag skips the secret scan and focuses solely on extracting infrastructure insights such as the Backend, Frontend, Server, Protocol (e.g., HTTP/2), and CDN/WAF.
 ```sh
 .\dist\surisc.exe -u https://example.com -i
 ```

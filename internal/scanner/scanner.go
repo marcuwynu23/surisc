@@ -3,6 +3,7 @@ package scanner
 import (
 	"log"
 	"math"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
@@ -67,6 +68,22 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	if err != nil {
 		log.Fatalf("Failed to set limit rule: %v", err)
 	}
+
+	// Capture HTTP Protocol (HTTP/1.1, HTTP/2.0)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		req, err := http.NewRequest("HEAD", targetURL, nil)
+		if err == nil {
+			req.Header.Set("User-Agent", "Mozilla/5.0")
+			client := &http.Client{Timeout: 5 * time.Second}
+			if resp, err := client.Do(req); err == nil {
+				insightMutex.Lock()
+				insight.Protocol = resp.Proto
+				insightMutex.Unlock()
+			}
+		}
+	}()
 
 	// Technical Insights: CMS and Frontend Check
 	c.OnHTML("meta[name=generator]", func(e *colly.HTMLElement) {
