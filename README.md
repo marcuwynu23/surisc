@@ -16,21 +16,35 @@ Written in Go, it operates entirely in memory to scrape, parse, and analyze Java
 - **Concurrent Engine**: Utilizes goroutines and `sync.WaitGroup` to process multiple Javascript bundles concurrently.
 - **Shannon Entropy Analysis**: Scans alphanumeric strings to calculate true information density (`H = - sum(p * log2(p))`), allowing the scanner to flag complex payloads such as JWTs or generic cloud provider keys.
 - **Pattern Matching**: Contains built-in rules designed to detect:
-  - AWS Access Keys (`AKIA...`)
-  - Stripe Secret Keys (`sk_live_...`)
-  - GitHub Personal Access Tokens (`ghp_...`)
-  - GitLab Personal Access Tokens (`glpat-...`)
-  - Mail Service API Keys (SendGrid, Mailgun, Resend)
-  - Payment & Gateway Tokens (Square, Twilio)
-  - RSA Private Keys headers (`-----BEGIN PRIVATE KEY...`)
-  - Slack API Tokens (`xoxb-...`)
-  - Google API Keys
-  - Exposed map file dependencies (`.map`)
-  - `Bearer` authentication tokens
-  - Internal IP address ranges (`10.x`, `172.16.x`, `192.168.x`)
-  - Build-time `import.meta` asset leaks
-  - Generic secret strings and variable assignments (e.g., `API_KEY:"value"`)
+
+  | Target / Platform | Pattern / Description |
+  | :--- | :--- |
+  | AWS Access Keys | `AKIA...` |
+  | Stripe Secret Keys | `sk_live_...` |
+  | GitHub Personal Access Tokens | `ghp_...` |
+  | GitLab Personal Access Tokens | `glpat-...` |
+  | Mail Service API Keys | SendGrid, Mailgun, Resend |
+  | Payment & Gateway Tokens | Square, Twilio |
+  | RSA Private Keys headers | `-----BEGIN PRIVATE KEY...` |
+  | Slack API Tokens | `xoxb-...` |
+  | Google API Keys | Generic GCP, Maps, Firebase (`AIza...`) |
+  | Exposed map file dependencies | `.map` |
+  | `Bearer` authentication tokens | `Bearer ...` |
+  | Internal IP address ranges | `10.x`, `172.16.x`, `192.168.x` |
+  | Build-time `import.meta` asset leaks | `import.meta.env.*` |
+  | Generic secret strings | Variable assignments (e.g., `API_KEY:"value"`) |
+
 - **False Positive Filtering**: Automatically ignores standard frontend compilation artifacts such as the Base64 sequence dictionary, WebAssembly module headers, and standard React.js validation warnings.
+
+## Terminology
+
+When looking at your scan results, here is what each term means:
+
+- **Gravity Score**: A number (usually 0 to 10) that tells you how certain we are that we found a real secret. A score of 10 means it is highly likely a real API key (like an AWS key). A lower score means it might just be a normal variable or false positive.
+- **Shannon Entropy**: A mathematical way of measuring how "random" a piece of text looks. Real API keys look like random gibberish (high entropy). Regular words like `"password"` don't look random (low entropy). This helps the scanner ignore normal text.
+- **Target / Leak Type**: What kind of secret was found. For example, `GOOGLE_API_KEY` or `STRIPE_SECRET_KEY`.
+- **Source URL**: The exact web address link where the leaked secret is located.
+- **Snippet**: A small preview of the exact code or key that leaked. This saves you from having to read through massive, messy code files yourself.
 
 ## Build Instructions
 
