@@ -6,9 +6,11 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
-	"surisc/internal/models"
 	colly "github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/extensions"
+	"surisc/internal/models"
 )
 
 var (
@@ -39,13 +41,26 @@ func RunScan(targetURL string) []models.Leak {
 		colly.Async(true),
 	)
 
+	// Apply browser-like evasion techniques
+	extensions.RandomUserAgent(c)
+	extensions.Referer(c)
+
+	c.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
+		r.Headers.Set("Cache-Control", "max-age=0")
+		r.Headers.Set("Connection", "keep-alive")
+		r.Headers.Set("Upgrade-Insecure-Requests", "1")
+	})
+
 	var leaks []models.Leak
 	var leaksMutex sync.Mutex
 	var wg sync.WaitGroup
 
 	err := c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: 10,
+		Parallelism: 5,               // Reduced to mimic realistic human traffic
+		RandomDelay: 2 * time.Second, // Delay between requests
 	})
 	if err != nil {
 		log.Fatalf("Failed to set limit rule: %v", err)
