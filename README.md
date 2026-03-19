@@ -16,6 +16,14 @@ Written in Go, it operates entirely in memory to scrape, parse, and analyze Java
 - **Concurrent Engine**: Utilizes goroutines and `sync.WaitGroup` to process multiple Javascript bundles concurrently.
 - **Shannon Entropy Analysis**: Scans alphanumeric strings to calculate true information density (`H = - sum(p * log2(p))`), allowing the scanner to flag complex payloads such as JWTs or generic cloud provider keys.
 - **Pattern Matching**: Contains built-in rules designed to detect:
+  - AWS Access Keys (`AKIA...`)
+  - Stripe Secret Keys (`sk_live_...`)
+  - GitHub Personal Access Tokens (`ghp_...`)
+  - GitLab Personal Access Tokens (`glpat-...`)
+  - Mail Service API Keys (SendGrid, Mailgun)
+  - Payment & Gateway Tokens (Square, Twilio)
+  - RSA Private Keys headers (`-----BEGIN PRIVATE KEY...`)
+  - Slack API Tokens (`xoxb-...`)
   - Google Firebase API Keys
   - Exposed map file dependencies (`.map`)
   - `Bearer` authentication tokens

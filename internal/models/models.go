@@ -11,6 +11,16 @@ const (
 	LeakTypeInternalIP  LeakType = "INTERNAL_IP_ADDRESS"
 	LeakTypeImportMeta  LeakType = "IMPORT_META_LEAK"
 	LeakTypeGenericSec  LeakType = "GENERIC_SECRET_KEY"
+	LeakTypeAWSKey      LeakType = "AWS_ACCESS_KEY"
+	LeakTypeStripeKey   LeakType = "STRIPE_SECRET_KEY"
+	LeakTypeGitHubToken LeakType = "GITHUB_PAT"
+	LeakTypeSlackToken  LeakType = "SLACK_TOKEN"
+	LeakTypeGitLabToken LeakType = "GITLAB_PAT"
+	LeakTypeSendGridKey LeakType = "SENDGRID_API_KEY"
+	LeakTypeMailgunKey  LeakType = "MAILGUN_API_KEY"
+	LeakTypeTwilioKey   LeakType = "TWILIO_API_KEY"
+	LeakTypeSquareToken LeakType = "SQUARE_ACCESS_TOKEN"
+	LeakTypeRSAPrivate  LeakType = "RSA_PRIVATE_KEY"
 )
 
 type Leak struct {
