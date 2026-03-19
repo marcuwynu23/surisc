@@ -76,3 +76,41 @@ SuriSC Completed. Results:
         [SNIPPET]: import.meta.env.VITE_BACKEND_API
 --------------------------------------------------------------------------------
 ```
+
+## Docker and Podman Usage
+
+SuriSC can be built and run in a container environment using either Docker or Podman.
+
+### Building the Image
+
+Using **Docker**:
+```sh
+docker build -t surisc .
+```
+
+Using **Podman**:
+```sh
+podman build -t surisc .
+```
+
+### Running the Container
+
+Once built, you can run the container by passing your target URL using the `-u` flag.
+
+Using **Docker**:
+```sh
+docker run --rm surisc -u https://example.com
+```
+For JSON output:
+```sh
+docker run --rm surisc -u https://example.com -o json
+```
+
+Using **Podman**:
+```sh
+podman run --rm surisc -u https://example.com
+```
+For JSON output:
+```sh
+podman run --rm surisc -u https://example.com -o json
+```
