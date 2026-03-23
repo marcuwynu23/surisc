@@ -30,7 +30,10 @@ linux:
 # ----------------------------
 installer-nsis: exe
 	@echo "Building NSIS installer..."
-	makensis -DOUTPUT_FILE=$(NSIS_OUTPUT) $(NSIS_SCRIPT)
+	@makensis \
+	  -DOUTPUT_FILE=$(NSIS_OUTPUT) \
+	  -DPRODUCT_VERSION=$(VERSION) \
+	  $(NSIS_SCRIPT)
 
 # ----------------------------
 # Debian package
