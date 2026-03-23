@@ -45,7 +45,6 @@ deb: linux check-fpm
 	  -n $(DEB_NAME) \
 	  -v $(DEB_VERSION) \
 	  --description "Surisc CLI tool" \
-	  --prefix /usr/local/bin \
 	  $(DIST_DIR)/surisc=/usr/local/bin/surisc
 
 # ----------------------------
