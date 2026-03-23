@@ -6,61 +6,73 @@ env:
 on:
   push:
     tags:
-      - 'v*' # Trigger on version tags (e.g., v1.0.0)
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Grants permission to create a release
+      contents: write
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
 
-    - name: Install Dependencies
-      run: go mod download
+      - name: Install Dependencies
+        run: go mod download
 
-    - name: Build for Windows
-      env:
-        GOOS: windows
-        GOARCH: amd64
-      run: go build -o dist/${{ env.NAME }}-windows-amd64.exe cmd/${{ env.NAME }}/main.go
+      # ✅ REQUIRED: install makensis
+      - name: Install NSIS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nsis
 
-    - name: Build for Linux
-      env:
-        GOOS: linux
-        GOARCH: amd64
-      run: go build -o dist/${{ env.NAME }}-linux-amd64 cmd/${{ env.NAME }}/main.go
+      # ✅ ensure dist exists
+      - name: Create dist directory
+        run: mkdir -p dist
 
-    - name: Build for macOS (Intel)
-      env:
-        GOOS: darwin
-        GOARCH: amd64
-      run: go build -o dist/${{ env.NAME }}-darwin-amd64 cmd/${{ env.NAME }}/main.go
+      - name: Build for Windows
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: go build -o dist/${{ env.NAME }}-windows-amd64.exe cmd/${{ env.NAME }}/main.go
 
-    - name: Build for macOS (Apple Silicon)
-      env:
-        GOOS: darwin
-        GOARCH: arm64
-      run: go build -o dist/${{ env.NAME }}-darwin-arm64 cmd/${{ env.NAME }}/main.go
+      # ✅ now makensis will work
+      - name: Build NSIS Installer
+        run: make installer-nsis
 
-    - name: GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          dist/${{ env.NAME }}-windows-amd64.exe
-          dist/${{ env.NAME }}-linux-amd64
-          dist/${{ env.NAME }}-darwin-amd64
-          dist/${{ env.NAME }}-darwin-arm64
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build for Linux
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -o dist/${{ env.NAME }}-linux-amd64 cmd/${{ env.NAME }}/main.go
+
+      - name: Build for macOS (Intel)
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+        run: go build -o dist/${{ env.NAME }}-darwin-amd64 cmd/${{ env.NAME }}/main.go
+
+      - name: Build for macOS (Apple Silicon)
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+        run: go build -o dist/${{ env.NAME }}-darwin-arm64 cmd/${{ env.NAME }}/main.go
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/${{ env.NAME }}-windows-amd64.exe
+            dist/${{ env.NAME }}-linux-amd64
+            dist/${{ env.NAME }}-darwin-amd64
+            dist/${{ env.NAME }}-darwin-arm64
+            dist/${{ env.NAME }}-setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
