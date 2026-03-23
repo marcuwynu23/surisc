@@ -2,12 +2,12 @@
 ; Requires NSIS (https://nsis.sourceforge.io/Download)
 
 !define PRODUCT_NAME "Surisc"
-!define PRODUCT_VERSION "1.0.0"
+!define PRODUCT_VERSION "1.1.2"
 !define PRODUCT_PUBLISHER "Mark Wayne Menorca"
 !define PRODUCT_EXE "surisc.exe"
 
 ;--------------------------------
-OutFile "..\dist\SuriscInstaller.exe"
+OutFile "..\dist\surisc-setup.exe"
 InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
 RequestExecutionLevel admin
 
