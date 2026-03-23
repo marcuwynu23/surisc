@@ -3,6 +3,7 @@ ENTRY_POINT := cmd/surisc/main.go
 
 NSIS_SCRIPT := installer/installer.nsis
 NSIS_OUTPUT := $(DIST_DIR)/surisc-setup.exe
+NSIS_VERSION := 1.0.0
 
 DEB_NAME := surisc
 DEB_VERSION ?= 1.0.0
