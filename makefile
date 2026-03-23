@@ -18,6 +18,10 @@ installer-nsis: exe
 	@echo "Building NSIS installer..."
 	makensis -DOUTPUT_FILE=$(NSIS_OUTPUT) $(NSIS_SCRIPT)
 
+
+test:
+	@echo "Running tests..."
+	go test ./...
 #----------------------------------
 # Debian package
 #----------------------------------
