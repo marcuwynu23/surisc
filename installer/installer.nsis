@@ -2,7 +2,9 @@
 ; Requires NSIS (https://nsis.sourceforge.io/Download)
 
 !define PRODUCT_NAME "Surisc"
-!define PRODUCT_VERSION "1.1.2"
+!ifndef PRODUCT_VERSION
+  !define PRODUCT_VERSION "dev"
+!endif
 !define PRODUCT_PUBLISHER "Mark Wayne Menorca"
 !define PRODUCT_EXE "surisc.exe"
 
