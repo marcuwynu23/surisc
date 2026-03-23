@@ -70,6 +70,7 @@ jobs:
         with:
           files: |
             dist/${{ env.NAME }}-windows-amd64.exe
+            
             dist/${{ env.NAME }}-linux-amd64
             dist/${{ env.NAME }}-darwin-amd64
             dist/${{ env.NAME }}-darwin-arm64
