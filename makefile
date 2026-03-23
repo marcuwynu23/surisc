@@ -1,25 +1,25 @@
 DIST_DIR := dist
 ENTRY_POINT := cmd/surisc/main.go
-WXS_FILE := installer/surisc.wxs
-MSI_NAME := surisc.msi
+
+NSIS_SCRIPT := installer/installer.nsis
+NSIS_OUTPUT := $(DIST_DIR)/surisc-setup.exe
+
 DEB_NAME := surisc
 DEB_VERSION := 1.0.0
 
-all: exe msi
+all: exe installer-nsis
 
 exe:
 	@echo "Building Windows executable..."
 	@mkdir -p $(DIST_DIR)
-	go build -o $(DIST_DIR)/surisc.exe $(ENTRY_POINT)
+	GOOS=windows GOARCH=amd64 go build -o $(DIST_DIR)/surisc.exe $(ENTRY_POINT)
 
 installer-nsis: exe
-	@echo "Building MSI installer..."
-	@makensis installer/installer.nsis
+	@echo "Building NSIS installer..."
+	makensis -DOUTPUT_FILE=$(NSIS_OUTPUT) $(NSIS_SCRIPT)
 
 #----------------------------------
-# Debian package target
-# Requires fpm (install with: gem install --no-document fpm)
-# Must run inside WSL/Linux environment
+# Debian package
 #----------------------------------
 deb: exe check-fpm
 	@echo "Building Debian (.deb) package..."
@@ -32,7 +32,8 @@ deb: exe check-fpm
 check-fpm:
 	@which fpm > /dev/null || (echo "fpm is not installed. Install it with: gem install --no-document fpm" && exit 1)
 
-.PHONY: clean
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf $(DIST_DIR)
+
+.PHONY: all exe installer-nsis deb clean
