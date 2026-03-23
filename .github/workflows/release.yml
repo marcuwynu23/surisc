@@ -27,32 +27,43 @@ jobs:
       - name: Install Dependencies
         run: go mod download
 
-      # ✅ REQUIRED: install makensis
+      # ------------------------
+      # Install tools
+      # ------------------------
       - name: Install NSIS
         run: |
           sudo apt-get update
           sudo apt-get install -y nsis
 
-      # ✅ ensure dist exists
+      - name: Install FPM
+        run: |
+          sudo apt-get install -y ruby ruby-dev build-essential
+          sudo gem install --no-document fpm
+
       - name: Create dist directory
         run: mkdir -p dist
 
+      # ------------------------
+      # Windows + Installer
+      # ------------------------
       - name: Build for Windows
         env:
           GOOS: windows
           GOARCH: amd64
         run: go build -o dist/${{ env.NAME }}-windows-amd64.exe cmd/${{ env.NAME }}/main.go
 
-      # ✅ now makensis will work
       - name: Build NSIS Installer
         run: make installer-nsis
 
-      - name: Build for Linux
-        env:
-          GOOS: linux
-          GOARCH: amd64
-        run: go build -o dist/${{ env.NAME }}-linux-amd64 cmd/${{ env.NAME }}/main.go
+      # ------------------------
+      # Linux + .deb (via Makefile)
+      # ------------------------
+      - name: Build Debian Package
+        run: make deb DEB_VERSION=${GITHUB_REF_NAME#v}
 
+      # ------------------------
+      # macOS
+      # ------------------------
       - name: Build for macOS (Intel)
         env:
           GOOS: darwin
@@ -65,15 +76,23 @@ jobs:
           GOARCH: arm64
         run: go build -o dist/${{ env.NAME }}-darwin-arm64 cmd/${{ env.NAME }}/main.go
 
+      # ------------------------
+      # Debug (IMPORTANT)
+      # ------------------------
+      - name: Debug dist contents
+        run: ls -la
+
+      # ------------------------
+      # Release
+      # ------------------------
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/${{ env.NAME }}-windows-amd64.exe
-            
-            dist/${{ env.NAME }}-linux-amd64
             dist/${{ env.NAME }}-darwin-amd64
             dist/${{ env.NAME }}-darwin-arm64
             dist/${{ env.NAME }}-setup.exe
+            *.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
