@@ -1,0 +1,36 @@
+SURISC LICENSE AGREEMENT
+
+IMPORTANT: PLEASE READ THIS LICENSE CAREFULLY BEFORE INSTALLING OR USING SURISC SOFTWARE.
+BY INSTALLING OR USING THIS SOFTWARE, YOU AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT.
+IF YOU DO NOT AGREE, DO NOT INSTALL OR USE THE SOFTWARE.
+
+1. License Grant
+   The author, Mark Wayne Menorca, grants you a non-exclusive, non-transferable, revocable license to install and use Surisc for personal or internal business purposes in accordance with this Agreement. This license does not grant you ownership of the software.
+
+2. Restrictions
+   You may not:
+
+* Redistribute, sell, sublicense, rent, lease, or provide the software to any third party without prior written permission.
+* Modify, decompile, reverse engineer, disassemble, or attempt to derive the source code of the software, except as permitted by applicable law.
+* Remove or alter any copyright, trademark, or proprietary notices contained in the software.
+* Use the software for illegal or unauthorized purposes.
+
+3. Ownership
+   All intellectual property rights in the software remain the property of Mark Wayne Menorca. No rights are granted other than as explicitly stated in this Agreement.
+
+4. Updates
+   The author may provide updates, patches, or new versions of the software. This Agreement applies to all such updates unless a separate license accompanies them.
+
+5. Disclaimer of Warranty
+   The software is provided "AS IS", without warranties of any kind, either express or implied, including but not limited to implied warranties of merchantability, fitness for a particular purpose, or non-infringement.
+
+6. Limitation of Liability
+   In no event shall Mark Wayne Menorca be liable for any direct, indirect, incidental, special, or consequential damages arising out of the use or inability to use the software, even if advised of the possibility of such damages.
+
+7. Termination
+   This license is effective until terminated. It will terminate automatically without notice if you fail to comply with any provision of this Agreement. Upon termination, you must destroy all copies of the software.
+
+8. Governing Law
+   This Agreement shall be governed by and construed in accordance with the laws of the Philippines, without regard to its conflict of law provisions.
+
+By installing or using this software, you acknowledge that you have read, understood, and agree to be bound by this Agreement.

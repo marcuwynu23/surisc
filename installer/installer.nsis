@@ -1,0 +1,81 @@
+; Surisc Installer
+; Requires NSIS (https://nsis.sourceforge.io/Download)
+
+!define PRODUCT_NAME "Surisc"
+!define PRODUCT_VERSION "1.0.0"
+!define PRODUCT_PUBLISHER "Mark Wayne Menorca"
+!define PRODUCT_EXE "surisc.exe"
+
+;--------------------------------
+OutFile "..\dist\SuriscInstaller.exe"
+InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
+RequestExecutionLevel admin
+
+;--------------------------------
+; Pages
+!include "MUI2.nsh"
+
+; Install pages
+!insertmacro MUI_PAGE_LICENSE "License.txt"
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+; Uninstall pages
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
+
+; Must be after all pages
+!insertmacro MUI_LANGUAGE "English"
+
+;--------------------------------
+; Optional: define custom headers to prevent 6001 warnings
+!define MUI_HEADER_TEXT "Installing ${PRODUCT_NAME}"
+!define MUI_HEADER_SUBTEXT "Please wait..."
+!define MUI_HEADERIMAGE
+
+;--------------------------------
+; Sections
+Section "Install"
+
+  ; Set installation directory
+  SetOutPath "$INSTDIR"
+
+  ; Copy executable
+  File "..\dist\${PRODUCT_EXE}"
+
+  ; Write uninstaller
+  WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+  ; Desktop shortcut
+  CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${PRODUCT_EXE}"
+
+  ; Start Menu shortcut
+  CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${PRODUCT_EXE}"
+
+  ; Registry entry for install path
+  WriteRegStr HKCU "Software\${PRODUCT_NAME}" "InstallPath" "$INSTDIR"
+
+SectionEnd
+
+;--------------------------------
+Section "Uninstall"
+
+  ; Delete installed files
+  Delete "$INSTDIR\${PRODUCT_EXE}"
+  Delete "$INSTDIR\Uninstall.exe"
+
+  ; Remove shortcuts
+  Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
+
+  ; Remove directories
+  RMDir "$SMPROGRAMS\${PRODUCT_NAME}"
+  RMDir "$INSTDIR"
+
+  ; Remove registry key
+  DeleteRegKey HKCU "Software\${PRODUCT_NAME}"
+
+SectionEnd
