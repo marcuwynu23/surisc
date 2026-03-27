@@ -25,6 +25,8 @@ Written in Go, it operates entirely in memory to scrape, parse, and analyze Java
   | GitLab Personal Access Tokens | `glpat-...` |
   | Mail Service API Keys | SendGrid, Mailgun, Resend |
   | Payment & Gateway Tokens | Square, Twilio |
+  | Cloudflare Credentials | Global API keys and API tokens |
+  | User API Tokens | `user_api_token` / `user-api-token` style assignments |
   | RSA Private Keys headers | `-----BEGIN PRIVATE KEY...` |
   | Slack API Tokens | `xoxb-...` |
   | Google API Keys | Generic GCP, Maps, Firebase (`AIza...`) |

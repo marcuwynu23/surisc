@@ -27,6 +27,9 @@ var (
 	rxResendKey        = regexp.MustCompile(`re_[a-zA-Z0-9]{24}`)
 	rxTwilioKey        = regexp.MustCompile(`(?:SK|AC)[a-z0-9]{32}`)
 	rxSquareToken      = regexp.MustCompile(`sq0[a-z]{3}-[0-9A-Za-z\-_]{22,43}`)
+	rxCloudflareGlobal = regexp.MustCompile(`(?i)(?:cloudflare|cf)[^\n]{0,80}(?:global(?:_|[\s-])?api(?:_|[\s-])?key|api(?:_|[\s-])?key)[^\n]{0,20}["']([0-9a-f]{37})["']`)
+	rxCloudflareToken  = regexp.MustCompile(`(?is)(?:cloudflare|cf)[\s\S]{0,80}(?:api(?:_|[\s-])?token|token)[\s"'=:]{0,20}([A-Za-z0-9\-_]{20,})`)
+	rxUserAPIToken     = regexp.MustCompile(`(?i)(?:user(?:_|[\s-])?api(?:_|[\s-])?token|api(?:_|[\s-])?token(?:_|[\s-])?user)[a-z0-9_]*["']?\s*[:=]\s*["']([A-Za-z0-9\-_]{16,})["']`)
 	rxRSAPrivate       = regexp.MustCompile(`-----BEGIN (?:RSA|DSA|EC|OPENSSH)? PRIVATE KEY-----`)
 	rxMapFile          = regexp.MustCompile(`sourceMappingURL=.*\.map`)
 	rxBearerToken      = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9\-\._~\+\/]+=*`)
@@ -280,7 +283,54 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 		}
 	}
 
-	// 1.7 RSA Private Keys
+	// 1.7 Cloudflare exposed credentials (global key / API token)
+	if matches := rxCloudflareGlobal.FindAllSubmatch(content, -1); matches != nil {
+		for _, m := range matches {
+			if len(m) > 1 {
+				localLeaks = append(localLeaks, models.Leak{
+					LeakType:     models.LeakTypeCloudflare,
+					SourceURL:    sourceURL,
+					GravityScore: 10.0,
+					Snippet:      truncate(string(m[1]), 50),
+				})
+			}
+		}
+	}
+	if matches := rxCloudflareToken.FindAllSubmatch(content, -1); matches != nil {
+		for _, m := range matches {
+			if len(m) > 1 {
+				token := string(m[1])
+				if shannonEntropy(token) > 3.2 {
+					localLeaks = append(localLeaks, models.Leak{
+						LeakType:     models.LeakTypeCloudflare,
+						SourceURL:    sourceURL,
+						GravityScore: 9.5,
+						Snippet:      truncate(token, 50),
+					})
+				}
+			}
+		}
+	}
+
+	// 1.8 User API token assignments
+	if matches := rxUserAPIToken.FindAllSubmatch(content, -1); matches != nil {
+		for _, m := range matches {
+			if len(m) > 1 {
+				token := string(m[1])
+				tokenLower := strings.ToLower(token)
+				if shannonEntropy(token) > 3.0 && !strings.Contains(tokenLower, "example") && !strings.Contains(tokenLower, "your_") {
+					localLeaks = append(localLeaks, models.Leak{
+						LeakType:     models.LeakTypeUserAPIToken,
+						SourceURL:    sourceURL,
+						GravityScore: 8.8,
+						Snippet:      truncate(token, 50),
+					})
+				}
+			}
+		}
+	}
+
+	// 1.9 RSA Private Keys
 	if matches := rxRSAPrivate.FindAll(content, -1); matches != nil {
 		for _, m := range matches {
 			localLeaks = append(localLeaks, models.Leak{
