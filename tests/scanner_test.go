@@ -20,7 +20,7 @@ func TestRunScan(t *testing.T) {
 		twilioKey := "S" + "K1234567890abcdef1234567890abcdef"
 		squareToken := "sq0" + "atp-" + "1234567890123456789012"
 
-		fmt.Fprintln(w, `
+		fmt.Fprintf(w, `
 			var googleApiKey = "AIzaSyCXwabcde1234567890fghijkLMNOPQrsX";
 			var awsKey = "AKIAIOSFODNN7EXAMPLE";
 			var stripeSecret = "%s";
