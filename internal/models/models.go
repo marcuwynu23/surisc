@@ -36,6 +36,7 @@ type Leak struct {
 type TechInsight struct {
 	Backend               string   `json:"backend,omitempty"`
 	Frontend              string   `json:"frontend,omitempty"`
+	Hosting               string   `json:"hosting,omitempty"`
 	Server                string   `json:"server,omitempty"`
 	CDNWAF                string   `json:"cdn_waf,omitempty"`
 	CMS                   string   `json:"cms,omitempty"`

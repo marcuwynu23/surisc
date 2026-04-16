@@ -57,6 +57,7 @@ func main() {
 				printInfoTable([][2]string{
 					{"Backend", insight.Backend},
 					{"Frontend", insight.Frontend},
+					{"Hosting", insight.Hosting},
 					{"Server", insight.Server},
 					{"Protocol", insight.Protocol},
 					{"CDN/WAF", insight.CDNWAF},
@@ -85,7 +86,7 @@ func main() {
 			}
 
 			hasOutput := false
-			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "" || insight.PWA != "" || insight.ContentSecurityPolicy != "" || insight.XFrameOptions != "" || insight.StrictTransportSecurity != "" || insight.AccessControlAllowOrigin != "" || len(insight.CookieSecurity) > 0 || len(insight.JWTIndicators) > 0) {
+			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Hosting != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "" || insight.PWA != "" || insight.ContentSecurityPolicy != "" || insight.XFrameOptions != "" || insight.StrictTransportSecurity != "" || insight.AccessControlAllowOrigin != "" || len(insight.CookieSecurity) > 0 || len(insight.JWTIndicators) > 0) {
 				hasOutput = true
 			}
 			if showRoutes && len(insight.Routes) > 0 {
