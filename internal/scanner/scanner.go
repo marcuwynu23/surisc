@@ -210,6 +210,9 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	// Intercept inline scripts and <script src="...">
 	c.OnHTML("script", func(e *colly.HTMLElement) {
 		src := e.Attr("src")
+		if !isCrawlableResourceRef(src) {
+			src = ""
+		}
 
 		// Tech Insights from script paths
 		if src != "" {
@@ -662,6 +665,27 @@ func classifySPAFromHTML(body []byte) string {
 		}
 	}
 	return "No"
+}
+
+func isCrawlableResourceRef(raw string) bool {
+	clean := strings.TrimSpace(raw)
+	if clean == "" {
+		return false
+	}
+	refURL, err := url.Parse(clean)
+	if err != nil {
+		return false
+	}
+	// Relative URLs and protocol-relative URLs are crawlable.
+	if refURL.Scheme == "" {
+		return true
+	}
+	switch strings.ToLower(refURL.Scheme) {
+	case "http", "https":
+		return true
+	default:
+		return false
+	}
 }
 
 func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mutex *sync.Mutex) {

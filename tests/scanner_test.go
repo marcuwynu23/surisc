@@ -1,7 +1,9 @@
 package tests
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -205,6 +207,31 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 	}
 	if len(insight.ProbedRoutes) != 1 || insight.ProbedRoutes[0] != "/admin -> 200" {
 		t.Fatalf("expected only real attack-surface route to remain, got %v", insight.ProbedRoutes)
+	}
+}
+
+func TestRunScanInformativeSkipsDataScriptSrc(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/robots.txt":
+			w.Header().Set("Content-Type", "text/plain")
+			fmt.Fprint(w, "User-agent: *\nAllow: /\n")
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<html><body><script src="data:text/javascript;base64,Zm9v"></script></body></html>`)
+		}
+	}))
+	defer ts.Close()
+
+	var logs bytes.Buffer
+	origOut := log.Writer()
+	log.SetOutput(&logs)
+	defer log.SetOutput(origOut)
+
+	_, _ = scanner.RunScan(ts.URL, true)
+
+	if strings.Contains(logs.String(), `unsupported protocol scheme "data"`) {
+		t.Fatalf("expected data: script sources to be skipped, got logs: %s", logs.String())
 	}
 }
 
