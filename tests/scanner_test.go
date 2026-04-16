@@ -437,8 +437,11 @@ func TestRunScanInformativeAddsVanillaForAlpineOnly(t *testing.T) {
 	defer ts.Close()
 
 	_, insight := scanner.RunScan(ts.URL, true)
-	if !strings.Contains(insight.Frontend, "Alpine.js") || !strings.Contains(insight.Frontend, "Vanilla JS") {
-		t.Fatalf("expected Alpine.js and Vanilla JS, got %q", insight.Frontend)
+	if !strings.Contains(insight.Frontend, "Alpine.js") {
+		t.Fatalf("expected Alpine.js detection, got %q", insight.Frontend)
+	}
+	if strings.Contains(insight.Frontend, "Vanilla JS") {
+		t.Fatalf("did not expect Vanilla JS when Alpine.js is clearly detected, got %q", insight.Frontend)
 	}
 }
 
