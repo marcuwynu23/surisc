@@ -37,6 +37,14 @@ Written in Go, it operates entirely in memory to scrape, parse, and analyze Java
   | Generic secret strings | Variable assignments (e.g., `API_KEY:"value"`) |
 
 - **False Positive Filtering**: Automatically ignores standard frontend compilation artifacts such as the Base64 sequence dictionary, WebAssembly module headers, and standard React.js validation warnings.
+- **Informative Security Posture Checks (`-i`)**:
+  - SPA likelihood detection (`Yes`, `Likely`, `No`).
+  - Security headers: `Content-Security-Policy`, `X-Frame-Options`, `Strict-Transport-Security`, `Access-Control-Allow-Origin`.
+  - Cookie hardening signals: `HttpOnly`, `Secure`, `SameSite`.
+  - JWT indicators from cookie names/values.
+  - Route discovery from HTML, JS, JSON, `robots.txt`, and `sitemap.xml`.
+  - Attack-surface probing for common paths (`/admin`, `/api`, `/auth`, `/dashboard`, `/graphql`) with SPA fallback filtering to reduce false positives.
+  - `robots.txt` / `sitemap.xml` validation (HTML fallback is ignored).
 
 ## Terminology
 
@@ -72,10 +80,22 @@ SuriSC can be executed directly from the terminal and supports both raw console 
 .\dist\surisc.exe -u https://example.com
 ```
 
-### Informative Target Analysis (Technology Stack Detection)
-The `-i` flag skips the secret scan and focuses solely on extracting infrastructure insights such as the Backend, Frontend, Server, Protocol (e.g., HTTP/2), and CDN/WAF.
+### Informative Target Analysis (Technology + Security Profiling)
+The `-i` flag skips secret-leak scanning and focuses on target profiling.
+
+Supported scopes:
+- `-i` or `-i all`: all informative sections
+- `-i serverinfo`: infra/security table only
+- `-i routes`: discovered routes + hidden route probe results
+- `-i robots`: `robots.txt` table only
+- `-i sitemaps`: `sitemap.xml` table only
+
 ```sh
 .\dist\surisc.exe -u https://example.com -i
+.\dist\surisc.exe -u https://example.com -i serverinfo
+.\dist\surisc.exe -u https://example.com -i routes
+.\dist\surisc.exe -u https://example.com -i robots
+.\dist\surisc.exe -u https://example.com -i sitemaps
 ```
 
 ### JSON Reporting Mode
