@@ -62,6 +62,10 @@ func main() {
 					{"CDN/WAF", insight.CDNWAF},
 					{"CMS", insight.CMS},
 					{"SPA", insight.SPA},
+					{"CSP", insight.ContentSecurityPolicy},
+					{"X-Frame-Options", insight.XFrameOptions},
+					{"HSTS", insight.StrictTransportSecurity},
+					{"ACAO", insight.AccessControlAllowOrigin},
 				})
 			}
 			if showRoutes && len(insight.Routes) > 0 {
@@ -75,7 +79,7 @@ func main() {
 			}
 
 			hasOutput := false
-			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "") {
+			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "" || insight.ContentSecurityPolicy != "" || insight.XFrameOptions != "" || insight.StrictTransportSecurity != "" || insight.AccessControlAllowOrigin != "") {
 				hasOutput = true
 			}
 			if showRoutes && len(insight.Routes) > 0 {

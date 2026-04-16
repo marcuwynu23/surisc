@@ -92,6 +92,18 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 			if resp, err := client.Do(req); err == nil {
 				insightMutex.Lock()
 				insight.Protocol = resp.Proto
+				if insight.ContentSecurityPolicy == "" {
+					insight.ContentSecurityPolicy = resp.Header.Get("Content-Security-Policy")
+				}
+				if insight.XFrameOptions == "" {
+					insight.XFrameOptions = resp.Header.Get("X-Frame-Options")
+				}
+				if insight.StrictTransportSecurity == "" {
+					insight.StrictTransportSecurity = resp.Header.Get("Strict-Transport-Security")
+				}
+				if insight.AccessControlAllowOrigin == "" {
+					insight.AccessControlAllowOrigin = resp.Header.Get("Access-Control-Allow-Origin")
+				}
 				insightMutex.Unlock()
 			}
 		}
@@ -215,6 +227,18 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 			} else if via := r.Headers.Get("Via"); via != "" {
 				insight.CDNWAF = "Via: " + via
 			}
+		}
+		if insight.ContentSecurityPolicy == "" {
+			insight.ContentSecurityPolicy = r.Headers.Get("Content-Security-Policy")
+		}
+		if insight.XFrameOptions == "" {
+			insight.XFrameOptions = r.Headers.Get("X-Frame-Options")
+		}
+		if insight.StrictTransportSecurity == "" {
+			insight.StrictTransportSecurity = r.Headers.Get("Strict-Transport-Security")
+		}
+		if insight.AccessControlAllowOrigin == "" {
+			insight.AccessControlAllowOrigin = r.Headers.Get("Access-Control-Allow-Origin")
 		}
 		insightMutex.Unlock()
 
