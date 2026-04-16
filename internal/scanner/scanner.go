@@ -305,8 +305,30 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	sort.Strings(insight.CookieSecurity)
 	sort.Strings(insight.JWTIndicators)
 	insight.Routes = sortedRoutes(routeSet)
+	insight.PWA = classifyPWA(insight.Routes)
 
 	return leaks, insight
+}
+
+func classifyPWA(routes []string) string {
+	hasManifest := false
+	hasSW := false
+	for _, r := range routes {
+		rl := strings.ToLower(r)
+		if strings.HasSuffix(rl, "manifest.webmanifest") || strings.HasSuffix(rl, "manifest.json") {
+			hasManifest = true
+		}
+		if strings.Contains(rl, "registersw.js") || strings.Contains(rl, "service-worker") || strings.Contains(rl, "sw.js") {
+			hasSW = true
+		}
+	}
+	if hasManifest && hasSW {
+		return "Yes"
+	}
+	if hasManifest || hasSW {
+		return "Likely"
+	}
+	return "No"
 }
 
 func mergeCookieInsights(cookies []*http.Cookie, insight *models.TechInsight) {

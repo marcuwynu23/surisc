@@ -62,6 +62,7 @@ func main() {
 					{"CDN/WAF", insight.CDNWAF},
 					{"CMS", insight.CMS},
 					{"SPA", insight.SPA},
+					{"PWA", insight.PWA},
 					{"CSP", insight.ContentSecurityPolicy},
 					{"X-Frame-Options", insight.XFrameOptions},
 					{"HSTS", insight.StrictTransportSecurity},
@@ -84,7 +85,7 @@ func main() {
 			}
 
 			hasOutput := false
-			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "" || insight.ContentSecurityPolicy != "" || insight.XFrameOptions != "" || insight.StrictTransportSecurity != "" || insight.AccessControlAllowOrigin != "" || len(insight.CookieSecurity) > 0 || len(insight.JWTIndicators) > 0) {
+			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "" || insight.PWA != "" || insight.ContentSecurityPolicy != "" || insight.XFrameOptions != "" || insight.StrictTransportSecurity != "" || insight.AccessControlAllowOrigin != "" || len(insight.CookieSecurity) > 0 || len(insight.JWTIndicators) > 0) {
 				hasOutput = true
 			}
 			if showRoutes && len(insight.Routes) > 0 {

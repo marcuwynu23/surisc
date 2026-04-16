@@ -41,6 +41,7 @@ type TechInsight struct {
 	CMS                   string   `json:"cms,omitempty"`
 	Protocol              string   `json:"protocol,omitempty"`
 	SPA                   string   `json:"spa,omitempty"`
+	PWA                   string   `json:"pwa,omitempty"`
 	ContentSecurityPolicy string   `json:"content_security_policy,omitempty"`
 	XFrameOptions         string   `json:"x_frame_options,omitempty"`
 	StrictTransportSecurity string `json:"strict_transport_security,omitempty"`
