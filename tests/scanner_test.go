@@ -109,6 +109,9 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 		case "/assets/app.js":
 			w.Header().Set("Content-Type", "application/javascript")
 			fmt.Fprint(w, `import React from "react"; import { createApp } from "vue"; console.log("solid-js"); window.Shopify = { shop: "demo.myshopify.com" };`)
+		case "/api/v1/users":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"ok":true}`)
 		case "/api", "/auth", "/dashboard", "/graphql", "/__surisc_nonexistent_route_probe__":
 			w.Header().Set("Content-Type", "text/html")
 			fmt.Fprint(w, "<html><body>spa fallback</body></html>")
@@ -343,6 +346,58 @@ func TestRunScanInformativeKeepsCloudflareProxiedWhenOriginFingerprintPresent(t 
 	_, insight := scanner.RunScan(ts.URL, true)
 	if insight.Hosting != "Cloudflare Proxied" {
 		t.Fatalf("expected Cloudflare Proxied with origin fingerprint, got %q", insight.Hosting)
+	}
+}
+
+func TestRunScanInformativeDoesNotDetectWordPressFromGenericMentions(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/assets/app.js":
+			w.Header().Set("Content-Type", "application/javascript")
+			fmt.Fprint(w, `const txt = "this markdown mentions wordpress and php as concepts";`)
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<html><body><script src="/assets/app.js"></script><div id="root"></div></body></html>`)
+		}
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if strings.Contains(insight.Frontend, "WordPress") {
+		t.Fatalf("expected no WordPress detection from generic mentions, got %q", insight.Frontend)
+	}
+}
+
+func TestRunScanInformativeFiltersTemplateAndFilesystemRoutes(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/users":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"ok":true}`)
+		case "/admin", "/api", "/auth", "/dashboard", "/graphql", "/__surisc_nonexistent_route_probe__":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, "<html><body>spa fallback</body></html>")
+		default:
+			w.Header().Set("Content-Type", "application/javascript")
+			fmt.Fprint(w, `
+				const sample = ["/:id", "/:id/edit", "/etc/nginx/sites-available", "/src/content/articles/demo.md", "/api/users", "/dashboard"];
+			`)
+		}
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if slices.Contains(insight.Routes, "/:id") || slices.Contains(insight.Routes, "/:id/edit") {
+		t.Fatalf("expected template routes to be filtered, got %v", insight.Routes)
+	}
+	if slices.Contains(insight.Routes, "/etc/nginx/sites-available") || slices.Contains(insight.Routes, "/src/content/articles/demo.md") {
+		t.Fatalf("expected filesystem/doc routes to be filtered, got %v", insight.Routes)
+	}
+	if !slices.Contains(insight.Routes, "/api/users") {
+		t.Fatalf("expected normal routes to remain, got %v", insight.Routes)
+	}
+	if slices.Contains(insight.Routes, "/dashboard") {
+		t.Fatalf("expected non-existing content-only route to be filtered, got %v", insight.Routes)
 	}
 }
 

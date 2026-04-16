@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -107,5 +108,41 @@ func TestAnalyzeContent_DoesNotFlagRSAHeaderWithoutKeyBody(t *testing.T) {
 		if leak.LeakType == models.LeakTypeRSAPrivate {
 			t.Fatalf("unexpected rsa key finding for marker-only content: %q", leak.Snippet)
 		}
+	}
+}
+
+func TestExtractRoutesFromContent_IgnoresMarkdownFencedCodeBlocks(t *testing.T) {
+	content := []byte(`
+outside route "/public/docs"
+
+` + "```bash" + `
+curl https://example.com/api/private
+cat /etc/nginx/sites-available
+echo "/admin"
+` + "```" + `
+
+outside absolute https://example.com/health
+`)
+
+	baseURL, err := url.Parse("https://example.com")
+	if err != nil {
+		t.Fatalf("failed to parse base url: %v", err)
+	}
+
+	routeSet := make(map[string]struct{})
+	var mu sync.Mutex
+	extractRoutesFromContent(content, baseURL, routeSet, &mu)
+
+	if _, ok := routeSet["/public/docs"]; !ok {
+		t.Fatalf("expected outside route to be kept, got %v", routeSet)
+	}
+	if _, ok := routeSet["/health"]; !ok {
+		t.Fatalf("expected outside absolute route to be kept, got %v", routeSet)
+	}
+	if _, ok := routeSet["/admin"]; ok {
+		t.Fatalf("expected fenced code route to be ignored, got %v", routeSet)
+	}
+	if _, ok := routeSet["/api/private"]; ok {
+		t.Fatalf("expected fenced absolute route to be ignored, got %v", routeSet)
 	}
 }
