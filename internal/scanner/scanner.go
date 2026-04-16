@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -360,6 +361,41 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	}
 
 	return leaks, insight
+}
+
+// ValidateTargetReachable performs a fast reachability check before scanning.
+// It treats any HTTP response as "reachable" (even 4xx/5xx), and errors only when
+// the connection/handshake fails or URL is invalid.
+func ValidateTargetReachable(targetURL string) error {
+	u, err := url.Parse(targetURL)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return fmt.Errorf("invalid target url %q", targetURL)
+	}
+
+	client := newScannerHTTPClient()
+
+	// Try HEAD first (cheap). Some servers block HEAD; treat that as reachable.
+	if req, err := http.NewRequest("HEAD", targetURL, nil); err == nil {
+		applyBrowserHeaders(req)
+		if resp, err := client.Do(req); err == nil {
+			_ = resp.Body.Close()
+			return nil
+		}
+	}
+
+	// Fallback to GET with Range to keep it light.
+	req, err := http.NewRequest("GET", targetURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	applyBrowserHeaders(req)
+	req.Header.Set("Range", "bytes=0-0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("target unreachable: %w", err)
+	}
+	_ = resp.Body.Close()
+	return nil
 }
 
 func addTech(name string, techSet map[string]struct{}, mu *sync.Mutex) {
@@ -817,34 +853,81 @@ func probeAttackSurfaceRoutes(base string, paths []string) attackSurfaceProbeRes
 	if err != nil {
 		return attackSurfaceProbeResult{}
 	}
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := newScannerHTTPClient()
 	results := make([]string, 0, len(paths))
 	existingPaths := make([]string, 0, len(paths))
-	var insight models.TechInsight
+	cookieSet := make(map[string]struct{})
+	jwtSet := make(map[string]struct{})
 	homeCT, homeBody, _, _ := fetchRouteResponse(client, baseURL, "/")
 	homeNormSig := normalizedResponseSignature(homeCT, homeBody, paths)
 	fallbackCT, fallbackBody, _, _ := fetchRouteResponse(client, baseURL, "/__surisc_nonexistent_route_probe__")
 	fallbackNormSig := normalizedResponseSignature(fallbackCT, fallbackBody, paths)
 
+	type probeResult struct {
+		path         string
+		statusCode   int
+		contentType  string
+		body         []byte
+		cookieSignal []string
+		jwtSignal    []string
+	}
+	workers := boundedWorkerCount(len(paths))
+	jobs := make(chan string, len(paths))
+	out := make(chan probeResult, len(paths))
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for p := range jobs {
+				ctype, body, statusCode, cookies := fetchRouteResponse(client, baseURL, p)
+				var cookieSignals, jwtSignals []string
+				if len(cookies) > 0 {
+					var local models.TechInsight
+					mergeCookieInsights(cookies, &local)
+					cookieSignals = local.CookieSecurity
+					jwtSignals = local.JWTIndicators
+				}
+				out <- probeResult{
+					path:         p,
+					statusCode:   statusCode,
+					contentType:  ctype,
+					body:         body,
+					cookieSignal: cookieSignals,
+					jwtSignal:    jwtSignals,
+				}
+			}
+		}()
+	}
 	for _, p := range paths {
-		ctype, body, statusCode, cookies := fetchRouteResponse(client, baseURL, p)
-		if statusCode == 0 {
-			results = append(results, fmt.Sprintf("%s -> request error", p))
+		jobs <- p
+	}
+	close(jobs)
+	wg.Wait()
+	close(out)
+	for r := range out {
+		for _, c := range r.cookieSignal {
+			cookieSet[c] = struct{}{}
+		}
+		for _, j := range r.jwtSignal {
+			jwtSet[j] = struct{}{}
+		}
+		if r.statusCode == 0 {
+			results = append(results, fmt.Sprintf("%s -> request error", r.path))
 			continue
 		}
-		mergeCookieInsights(cookies, &insight)
-		if statusCode < 400 {
-			normalizedSig := normalizedResponseSignature(ctype, body, paths)
-			if isLikelyFallbackResponse(ctype, normalizedSig, homeNormSig, fallbackNormSig) {
+		if r.statusCode < 400 {
+			normalizedSig := normalizedResponseSignature(r.contentType, r.body, paths)
+			if isLikelyFallbackResponse(r.contentType, normalizedSig, homeNormSig, fallbackNormSig) {
 				continue
 			}
 			// Be conservative: 200 HTML on probed admin/api/auth paths is often SPA fallback.
 			// Only keep 200 responses when they are non-HTML and more likely endpoint-specific.
-			if statusCode == 200 && strings.Contains(strings.ToLower(ctype), "html") {
+			if r.statusCode == 200 && strings.Contains(strings.ToLower(r.contentType), "html") {
 				continue
 			}
-			results = append(results, fmt.Sprintf("%s -> %d", p, statusCode))
-			existingPaths = append(existingPaths, p)
+			results = append(results, fmt.Sprintf("%s -> %d", r.path, r.statusCode))
+			existingPaths = append(existingPaths, r.path)
 		}
 	}
 	sort.Strings(results)
@@ -852,8 +935,8 @@ func probeAttackSurfaceRoutes(base string, paths []string) attackSurfaceProbeRes
 	return attackSurfaceProbeResult{
 		routes:        results,
 		existingPaths: existingPaths,
-		cookies:       insight.CookieSecurity,
-		jwtIndicators: insight.JWTIndicators,
+		cookies:       mapKeys(cookieSet),
+		jwtIndicators: mapKeys(jwtSet),
 	}
 }
 
@@ -1389,7 +1472,7 @@ func mergeValidatedContentRoutes(base string, routeSet map[string]struct{}, cand
 	if err != nil {
 		return
 	}
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := newScannerHTTPClient()
 	paths := make([]string, 0, len(candidates))
 	for p := range candidates {
 		if _, ok := routeSet[p]; ok {
@@ -1407,22 +1490,75 @@ func mergeValidatedContentRoutes(base string, routeSet map[string]struct{}, cand
 	missingCT, missingBody, _, _ := fetchRouteResponse(client, baseURL, "/__surisc_nonexistent_route_probe__")
 	missingSig := normalizedResponseSignature(missingCT, missingBody, paths)
 
+	type routeValidationResult struct {
+		path       string
+		statusCode int
+		contentType string
+		body       []byte
+	}
+	workers := boundedWorkerCount(len(paths))
+	jobs := make(chan string, len(paths))
+	out := make(chan routeValidationResult, len(paths))
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for p := range jobs {
+				ctype, body, statusCode, _ := fetchRouteResponse(client, baseURL, p)
+				out <- routeValidationResult{path: p, statusCode: statusCode, contentType: ctype, body: body}
+			}
+		}()
+	}
 	for _, p := range paths {
-		ctype, body, statusCode, _ := fetchRouteResponse(client, baseURL, p)
-		if statusCode == 0 || statusCode >= 400 {
+		jobs <- p
+	}
+	close(jobs)
+	wg.Wait()
+	close(out)
+	for r := range out {
+		if r.statusCode == 0 || r.statusCode >= 400 {
 			continue
 		}
-		normSig := normalizedResponseSignature(ctype, body, paths)
-		if isLikelyFallbackResponse(ctype, normSig, homeSig, missingSig) {
+		normSig := normalizedResponseSignature(r.contentType, r.body, paths)
+		if isLikelyFallbackResponse(r.contentType, normSig, homeSig, missingSig) {
 			continue
 		}
 		// If HTML looks like generic SPA shell/fallback, keep it out of routes list.
-		if statusCode == 200 && strings.Contains(strings.ToLower(ctype), "html") {
+		if r.statusCode == 200 && strings.Contains(strings.ToLower(r.contentType), "html") {
 			continue
 		}
 		mu.Lock()
-		routeSet[p] = struct{}{}
+		routeSet[r.path] = struct{}{}
 		mu.Unlock()
+	}
+}
+
+func boundedWorkerCount(n int) int {
+	if n <= 0 {
+		return 1
+	}
+	maxWorkers := runtime.NumCPU() * 2
+	if maxWorkers < 4 {
+		maxWorkers = 4
+	}
+	if maxWorkers > 24 {
+		maxWorkers = 24
+	}
+	if n < maxWorkers {
+		return n
+	}
+	return maxWorkers
+}
+
+func newScannerHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 32,
+			IdleConnTimeout:     30 * time.Second,
+		},
 	}
 }
 
