@@ -117,7 +117,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if body, ok := fetchOptionalText(targetURL, "/robots.txt"); ok {
+			if body, ok := fetchOptionalRobots(targetURL); ok {
 				insightMutex.Lock()
 				insight.RobotsTxt = body
 				insightMutex.Unlock()
@@ -128,7 +128,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if body, ok := fetchOptionalText(targetURL, "/sitemap.xml"); ok {
+			if body, ok := fetchOptionalSitemap(targetURL); ok {
 				insightMutex.Lock()
 				insight.SitemapXML = body
 				insightMutex.Unlock()
@@ -936,6 +936,89 @@ func fetchOptionalText(base, p string) (string, bool) {
 		return "", false
 	}
 	return s, true
+}
+
+func fetchOptionalRobots(base string) (string, bool) {
+	text, ctype, ok := fetchOptionalWithType(base, "/robots.txt")
+	if !ok {
+		return "", false
+	}
+	bodyLower := strings.ToLower(strings.TrimSpace(text))
+	typeLower := strings.ToLower(ctype)
+
+	// Reject common SPA/HTML fallbacks.
+	if strings.Contains(typeLower, "text/html") ||
+		strings.HasPrefix(bodyLower, "<!doctype html") ||
+		strings.HasPrefix(bodyLower, "<html") {
+		return "", false
+	}
+	// Prefer robot-like directives.
+	if strings.Contains(bodyLower, "user-agent:") ||
+		strings.Contains(bodyLower, "disallow:") ||
+		strings.Contains(bodyLower, "allow:") ||
+		strings.Contains(bodyLower, "sitemap:") {
+		return text, true
+	}
+	return "", false
+}
+
+func fetchOptionalSitemap(base string) (string, bool) {
+	text, ctype, ok := fetchOptionalWithType(base, "/sitemap.xml")
+	if !ok {
+		return "", false
+	}
+	bodyLower := strings.ToLower(strings.TrimSpace(text))
+	typeLower := strings.ToLower(ctype)
+
+	if strings.Contains(typeLower, "text/html") ||
+		strings.HasPrefix(bodyLower, "<!doctype html") ||
+		strings.HasPrefix(bodyLower, "<html") {
+		return "", false
+	}
+	if strings.Contains(typeLower, "xml") ||
+		strings.Contains(bodyLower, "<urlset") ||
+		strings.Contains(bodyLower, "<sitemapindex") {
+		return text, true
+	}
+	return "", false
+}
+
+func fetchOptionalWithType(base, p string) (string, string, bool) {
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		return "", "", false
+	}
+	ref, err := url.Parse(p)
+	if err != nil {
+		return "", "", false
+	}
+
+	u := baseURL.ResolveReference(ref).String()
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return "", "", false
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", "", false
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 200*1024))
+	if err != nil {
+		return "", "", false
+	}
+	s := strings.TrimSpace(string(body))
+	if s == "" {
+		return "", "", false
+	}
+	return s, resp.Header.Get("Content-Type"), true
 }
 
 func mustParseURL(raw string) *url.URL {

@@ -190,3 +190,25 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 		t.Fatalf("expected only real attack-surface route to remain, got %v", insight.ProbedRoutes)
 	}
 }
+
+func TestRunScanInformativeIgnoresHTMLFallbackForRobotsAndSitemap(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/robots.txt", "/sitemap.xml":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<!doctype html><html><body>fallback</body></html>`)
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<html><body><div id="root"></div></body></html>`)
+		}
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if insight.RobotsTxt != "" {
+		t.Fatalf("expected robots.txt HTML fallback to be ignored")
+	}
+	if insight.SitemapXML != "" {
+		t.Fatalf("expected sitemap.xml HTML fallback to be ignored")
+	}
+}
