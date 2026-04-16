@@ -980,8 +980,8 @@ func fetchOptionalRobots(base string) (string, bool) {
 
 	// Reject common SPA/HTML fallbacks.
 	if strings.Contains(typeLower, "text/html") ||
-		strings.HasPrefix(bodyLower, "<!doctype html") ||
-		strings.HasPrefix(bodyLower, "<html") {
+		strings.Contains(bodyLower, "<!doctype html") ||
+		strings.Contains(bodyLower, "<html") {
 		return "", false
 	}
 	// Prefer robot-like directives.
@@ -1003,8 +1003,8 @@ func fetchOptionalSitemap(base string) (string, bool) {
 	typeLower := strings.ToLower(ctype)
 
 	if strings.Contains(typeLower, "text/html") ||
-		strings.HasPrefix(bodyLower, "<!doctype html") ||
-		strings.HasPrefix(bodyLower, "<html") {
+		strings.Contains(bodyLower, "<!doctype html") ||
+		strings.Contains(bodyLower, "<html") {
 		return "", false
 	}
 	if strings.Contains(typeLower, "xml") ||
