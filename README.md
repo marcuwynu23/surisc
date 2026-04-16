@@ -38,7 +38,7 @@ Written in Go, it operates entirely in memory to scrape, parse, and analyze Java
 
 - **False Positive Filtering**: Automatically ignores standard frontend compilation artifacts such as the Base64 sequence dictionary, WebAssembly module headers, and standard React.js validation warnings.
 - **Informative Security Posture Checks (`-i`)**:
-  - SPA likelihood detection (`Yes`, `Likely`, `No`).
+  - SPA detection (`Yes` or `No`).
   - Security headers: `Content-Security-Policy`, `X-Frame-Options`, `Strict-Transport-Security`, `Access-Control-Allow-Origin`.
   - Cookie hardening signals: `HttpOnly`, `Secure`, `SameSite`.
   - JWT indicators from cookie names/values.
