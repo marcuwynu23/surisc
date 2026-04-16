@@ -34,10 +34,14 @@ type Leak struct {
 }
 
 type TechInsight struct {
-	Backend  string `json:"backend,omitempty"`
-	Frontend string `json:"frontend,omitempty"`
-	Server   string `json:"server,omitempty"`
-	CDNWAF   string `json:"cdn_waf,omitempty"`
-	CMS      string `json:"cms,omitempty"`
-	Protocol string `json:"protocol,omitempty"`
+	Backend    string `json:"backend,omitempty"`
+	Frontend   string `json:"frontend,omitempty"`
+	Server     string `json:"server,omitempty"`
+	CDNWAF     string `json:"cdn_waf,omitempty"`
+	CMS        string `json:"cms,omitempty"`
+	Protocol   string `json:"protocol,omitempty"`
+	SPA        string `json:"spa,omitempty"`
+	Routes     []string `json:"routes,omitempty"`
+	RobotsTxt  string `json:"robots_txt,omitempty"`
+	SitemapXML string `json:"sitemap_xml,omitempty"`
 }

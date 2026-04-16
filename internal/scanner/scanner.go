@@ -1,10 +1,13 @@
 package scanner
 
 import (
+	"io"
 	"log"
 	"math"
 	"net/http"
+	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -30,7 +33,7 @@ var (
 	rxCloudflareGlobal = regexp.MustCompile(`(?i)(?:cloudflare|cf)[^\n]{0,80}(?:global(?:_|[\s-])?api(?:_|[\s-])?key|api(?:_|[\s-])?key)[^\n]{0,20}["']([0-9a-f]{37})["']`)
 	rxCloudflareToken  = regexp.MustCompile(`(?is)(?:cloudflare|cf)[\s\S]{0,80}(?:api(?:_|[\s-])?token|token)[\s"'=:]{0,20}([A-Za-z0-9\-_]{20,})`)
 	rxUserAPIToken     = regexp.MustCompile(`(?i)(?:user(?:_|[\s-])?api(?:_|[\s-])?token|api(?:_|[\s-])?token(?:_|[\s-])?user)[a-z0-9_]*["']?\s*[:=]\s*["']([A-Za-z0-9\-_]{16,})["']`)
-	rxRSAPrivate       = regexp.MustCompile(`-----BEGIN (?:RSA|DSA|EC|OPENSSH)? PRIVATE KEY-----`)
+	rxRSAPrivate       = regexp.MustCompile(`(?s)-----BEGIN (?:RSA|DSA|EC|OPENSSH)? PRIVATE KEY-----[\s\S]{32,}?-----END (?:RSA|DSA|EC|OPENSSH)? PRIVATE KEY-----`)
 	rxMapFile          = regexp.MustCompile(`sourceMappingURL=.*\.map`)
 	rxBearerToken      = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9\-\._~\+\/]+=*`)
 	rxInternalIP       = regexp.MustCompile(`(?:10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)`)
@@ -38,6 +41,9 @@ var (
 	rxSecretAssignment = regexp.MustCompile(`(?i)(?:api_?key|apikey|secret|token|password)[a-z0-9_]*["']?\s*[:=]\s*["']([A-Za-z0-9\-_=+\/]{12,})["']`)
 	rxSecretString     = regexp.MustCompile(`(?i)["'][a-z0-9_]*(?:api_?key|apikey|secret|token|password)[a-z0-9_]*["']`)
 	rxPotentialSecret  = regexp.MustCompile(`["'][A-Za-z0-9/+=]{20,}["']`)
+	rxBTCAddress       = regexp.MustCompile(`^(?:[13])[a-km-zA-HJ-NP-Z1-9]{25,34}$`)
+	rxRouteLiteral     = regexp.MustCompile(`["'](\/[A-Za-z0-9._~!$&()*+,;=:@%\-\/]*)["']`)
+	rxAbsoluteURL      = regexp.MustCompile(`https?://[A-Za-z0-9\.\-]+(?:\:[0-9]+)?\/[A-Za-z0-9._~!$&()*+,;=:@%\-\/]*`)
 )
 
 func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.TechInsight) {
@@ -61,6 +67,9 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	var insight models.TechInsight
 	var leaksMutex sync.Mutex
 	var insightMutex sync.Mutex
+	var routesMutex sync.Mutex
+	routeSet := make(map[string]struct{})
+	baseTarget := mustParseURL(targetURL)
 	var wg sync.WaitGroup
 
 	err := c.Limit(&colly.LimitRule{
@@ -88,6 +97,30 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		}
 	}()
 
+	if informativeOnly {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if body, ok := fetchOptionalText(targetURL, "/robots.txt"); ok {
+				insightMutex.Lock()
+				insight.RobotsTxt = body
+				insightMutex.Unlock()
+				extractRoutesFromContent([]byte(body), mustParseURL(targetURL), routeSet, &routesMutex)
+			}
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if body, ok := fetchOptionalText(targetURL, "/sitemap.xml"); ok {
+				insightMutex.Lock()
+				insight.SitemapXML = body
+				insightMutex.Unlock()
+				extractRoutesFromContent([]byte(body), mustParseURL(targetURL), routeSet, &routesMutex)
+			}
+		}()
+	}
+
 	// Technical Insights: CMS and Frontend Check
 	c.OnHTML("meta[name=generator]", func(e *colly.HTMLElement) {
 		insightMutex.Lock()
@@ -99,6 +132,32 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		insightMutex.Lock()
 		defer insightMutex.Unlock()
 		insight.Frontend = "React (Next.js)"
+		insight.SPA = "Yes"
+	})
+
+	c.OnHTML("div[id=root], div[id=app], script[type=module]", func(e *colly.HTMLElement) {
+		insightMutex.Lock()
+		defer insightMutex.Unlock()
+		if insight.SPA == "" {
+			insight.SPA = "Likely"
+		}
+	})
+
+	// Collect route hints from common HTML attributes.
+	c.OnHTML("a[href], link[href], script[src], img[src], form[action]", func(e *colly.HTMLElement) {
+		var ref string
+		switch {
+		case e.Attr("href") != "":
+			ref = e.Attr("href")
+		case e.Attr("src") != "":
+			ref = e.Attr("src")
+		default:
+			ref = e.Attr("action")
+		}
+		if ref == "" {
+			return
+		}
+		addRoute(ref, e.Request.URL, routeSet, &routesMutex)
 	})
 
 	// Intercept inline scripts and <script src="...">
@@ -110,8 +169,10 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 			insightMutex.Lock()
 			if strings.Contains(src, "/_next/") {
 				insight.Frontend = "React (Next.js)"
+				insight.SPA = "Yes"
 			} else if strings.Contains(src, "/_nuxt/") {
 				insight.Frontend = "Vue.js (Nuxt)"
+				insight.SPA = "Yes"
 			} else if strings.Contains(src, "wp-includes") || strings.Contains(src, "wp-content") {
 				insight.CMS = "WordPress"
 				insight.Backend = "PHP (WordPress)"
@@ -158,6 +219,19 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		insightMutex.Unlock()
 
 		ctype := r.Headers.Get("Content-Type")
+		if strings.Contains(ctype, "text/html") && baseTarget != nil && r.Request.URL != nil && r.Request.URL.Host == baseTarget.Host {
+			classification := classifySPAFromHTML(r.Body)
+			if classification != "" {
+				insightMutex.Lock()
+				if insight.SPA == "" || insight.SPA == "No" {
+					insight.SPA = classification
+				}
+				insightMutex.Unlock()
+			}
+		}
+		if strings.Contains(ctype, "javascript") || strings.Contains(ctype, "json") || strings.Contains(ctype, "text/html") || strings.HasSuffix(r.Request.URL.Path, ".js") {
+			extractRoutesFromContent(r.Body, r.Request.URL, routeSet, &routesMutex)
+		}
 		if !informativeOnly && (strings.Contains(ctype, "javascript") || strings.Contains(ctype, "json") || strings.HasSuffix(r.Request.URL.Path, ".js")) {
 			content := make([]byte, len(r.Body))
 			copy(content, r.Body) // Copy to isolate from colly internal buffers
@@ -177,8 +251,32 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	c.Visit(targetURL)
 	c.Wait()
 	wg.Wait()
+	if insight.SPA == "" {
+		insight.SPA = "No"
+	}
+	insight.Routes = sortedRoutes(routeSet)
 
 	return leaks, insight
+}
+
+func classifySPAFromHTML(body []byte) string {
+	html := strings.ToLower(string(body))
+	positiveSignals := []string{
+		`id="__next"`,
+		`id='__next'`,
+		`id="root"`,
+		`id='root'`,
+		`id="app"`,
+		`id='app'`,
+		`<script type="module"`,
+		`<script type='module'`,
+	}
+	for _, signal := range positiveSignals {
+		if strings.Contains(html, signal) {
+			return "Likely"
+		}
+	}
+	return "No"
 }
 
 func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mutex *sync.Mutex) {
@@ -318,7 +416,7 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 			if len(m) > 1 {
 				token := string(m[1])
 				tokenLower := strings.ToLower(token)
-				if shannonEntropy(token) > 3.0 && !strings.Contains(tokenLower, "example") && !strings.Contains(tokenLower, "your_") {
+				if shannonEntropy(token) > 3.0 && !isLikelyPlaceholderValue(tokenLower) {
 					localLeaks = append(localLeaks, models.Leak{
 						LeakType:     models.LeakTypeUserAPIToken,
 						SourceURL:    sourceURL,
@@ -405,7 +503,7 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 				secret = secret[1 : len(secret)-1] // strip quotes
 			}
 
-			if len(secret) > 20 && !strings.HasPrefix(secret, "AGFzbQE") && !strings.HasPrefix(secret, "AIza") && !strings.Contains(secret, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") {
+			if len(secret) > 20 && !strings.HasPrefix(secret, "AGFzbQE") && !strings.HasPrefix(secret, "AIza") && !strings.Contains(secret, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") && !isLikelyNonSecretHighEntropy(secret) {
 				ent := shannonEntropy(secret)
 				if ent > 4.5 {
 					localLeaks = append(localLeaks, models.Leak{
@@ -426,7 +524,7 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 				val := string(m[1])
 				valLower := strings.ToLower(val)
 				// Filter known placeholders and require minimum entropy for the value
-				if shannonEntropy(val) > 3.0 && !strings.Contains(valLower, "your_") && !strings.Contains(valLower, "example") {
+				if shannonEntropy(val) > 3.0 && !isLikelyPlaceholderValue(valLower) && !isLikelyRouteValue(val) {
 					localLeaks = append(localLeaks, models.Leak{
 						LeakType:     models.LeakTypeGenericSec,
 						SourceURL:    sourceURL,
@@ -448,6 +546,10 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 					continue
 				}
 
+				if isLikelyPlaceholderValue(strings.ToLower(s)) {
+					continue
+				}
+
 				// Should have very high entropy, or be a massive uppercase warning string
 				if shannonEntropy(s) > 4.0 || (strings.ToUpper(s) == s && strings.Contains(s, "SECRET")) {
 					localLeaks = append(localLeaks, models.Leak{
@@ -462,6 +564,7 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 	}
 
 	if len(localLeaks) > 0 {
+		localLeaks = dedupeLeaks(localLeaks)
 		mutex.Lock()
 		*leaks = append(*leaks, localLeaks...)
 		mutex.Unlock()
@@ -493,4 +596,167 @@ func truncate(s string, l int) string {
 		return s[:l] + "..."
 	}
 	return s
+}
+
+// isLikelyRouteValue suppresses path-like values from generic secret assignments.
+func isLikelyRouteValue(val string) bool {
+	v := strings.TrimSpace(strings.ToLower(val))
+	if strings.HasPrefix(v, "/") {
+		return true
+	}
+	if strings.HasPrefix(v, "./") || strings.HasPrefix(v, "../") {
+		return true
+	}
+	if strings.Contains(v, "/auth/") || strings.Contains(v, "/api/") {
+		return true
+	}
+	return false
+}
+
+func isLikelyPlaceholderValue(v string) bool {
+	normalized := strings.NewReplacer("-", "_", " ", "_").Replace(v)
+	return strings.Contains(normalized, "your_") ||
+		strings.Contains(normalized, "example") ||
+		strings.Contains(normalized, "sample") ||
+		strings.Contains(normalized, "dummy") ||
+		strings.Contains(normalized, "test_") ||
+		strings.Contains(normalized, "changeme")
+}
+
+// isLikelyNonSecretHighEntropy filters common high-entropy but non-secret literals.
+func isLikelyNonSecretHighEntropy(secret string) bool {
+	// Legacy Base58 Bitcoin addresses are high entropy but public by design.
+	if rxBTCAddress.MatchString(secret) {
+		return true
+	}
+	// Minified frontend bundles often contain opaque identifiers that are alnum-only.
+	// If it is strictly alphanumeric and begins with a digit, treat as likely ID.
+	if len(secret) >= 24 && len(secret) <= 40 && strings.HasPrefix(secret, "1") {
+		isAlphaNum := true
+		for _, ch := range secret {
+			if !(ch >= 'a' && ch <= 'z') && !(ch >= 'A' && ch <= 'Z') && !(ch >= '0' && ch <= '9') {
+				isAlphaNum = false
+				break
+			}
+		}
+		if isAlphaNum {
+			return true
+		}
+	}
+	return false
+}
+
+func dedupeLeaks(in []models.Leak) []models.Leak {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]models.Leak, 0, len(in))
+	for _, leak := range in {
+		key := string(leak.LeakType) + "|" + leak.SourceURL + "|" + leak.Snippet
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, leak)
+	}
+	return out
+}
+
+func extractRoutesFromContent(content []byte, baseURL *url.URL, routeSet map[string]struct{}, mu *sync.Mutex) {
+	matches := rxRouteLiteral.FindAllSubmatch(content, -1)
+	for _, m := range matches {
+		if len(m) < 2 {
+			continue
+		}
+		addRoute(string(m[1]), baseURL, routeSet, mu)
+	}
+
+	absMatches := rxAbsoluteURL.FindAll(content, -1)
+	for _, m := range absMatches {
+		addRoute(string(m), baseURL, routeSet, mu)
+	}
+}
+
+func addRoute(raw string, baseURL *url.URL, routeSet map[string]struct{}, mu *sync.Mutex) {
+	clean := strings.TrimSpace(raw)
+	if clean == "" || strings.HasPrefix(clean, "#") || strings.HasPrefix(clean, "data:") || strings.HasPrefix(clean, "javascript:") {
+		return
+	}
+
+	refURL, err := url.Parse(clean)
+	if err != nil {
+		return
+	}
+	if baseURL == nil {
+		return
+	}
+	abs := baseURL.ResolveReference(refURL)
+	if abs.Host != baseURL.Host || abs.Path == "" || abs.Path == "/" {
+		return
+	}
+
+	normalized := abs.Path
+	if abs.RawQuery != "" {
+		normalized += "?" + abs.RawQuery
+	}
+
+	mu.Lock()
+	routeSet[normalized] = struct{}{}
+	mu.Unlock()
+}
+
+func sortedRoutes(routeSet map[string]struct{}) []string {
+	if len(routeSet) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(routeSet))
+	for r := range routeSet {
+		out = append(out, r)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func fetchOptionalText(base, p string) (string, bool) {
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		return "", false
+	}
+	ref, err := url.Parse(p)
+	if err != nil {
+		return "", false
+	}
+
+	u := baseURL.ResolveReference(ref).String()
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return "", false
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", false
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 200*1024))
+	if err != nil {
+		return "", false
+	}
+	s := strings.TrimSpace(string(body))
+	if s == "" {
+		return "", false
+	}
+	return s, true
+}
+
+func mustParseURL(raw string) *url.URL {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil
+	}
+	return u
 }
