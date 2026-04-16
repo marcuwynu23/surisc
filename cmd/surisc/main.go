@@ -48,7 +48,7 @@ func main() {
 			fmt.Println("\n🛰️  Surisc Informative Target Analysis:")
 
 			showAll := informativeScope == "all"
-			showServerInfo := showAll || informativeScope == "serverinfo"
+			showServerInfo := showAll || informativeScope == "webinfo"
 			showRoutes := showAll || informativeScope == "routes"
 			showRobots := showAll || informativeScope == "robots"
 			showSitemaps := showAll || informativeScope == "sitemaps"
@@ -140,10 +140,10 @@ func parseInformativeArgs(args []string) ([]string, bool, string, error) {
 			switch next {
 			case "", "all":
 				scope = "all"
-			case "robots", "routes", "sitemaps", "serverinfo":
+			case "robots", "routes", "sitemaps", "webinfo":
 				scope = next
 			default:
-				return nil, false, "", fmt.Errorf("invalid -i value %q; use serverinfo|robots|routes|sitemaps or leave blank", next)
+				return nil, false, "", fmt.Errorf("invalid -i value %q; use webinfo|robots|routes|sitemaps or leave blank", next)
 			}
 			continue
 		}
@@ -158,10 +158,10 @@ func parseInformativeArgs(args []string) ([]string, bool, string, error) {
 			switch next {
 			case "", "all":
 				scope = "all"
-			case "robots", "routes", "sitemaps", "serverinfo":
+			case "robots", "routes", "sitemaps", "webinfo":
 				scope = next
 			default:
-				return nil, false, "", fmt.Errorf("invalid -i value %q; use serverinfo|robots|routes|sitemaps or leave blank", next)
+				return nil, false, "", fmt.Errorf("invalid -i value %q; use webinfo|robots|routes|sitemaps or leave blank", next)
 			}
 			i++
 		}

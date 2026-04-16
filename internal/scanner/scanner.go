@@ -60,10 +60,19 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	extensions.Referer(c)
 
 	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
 		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
 		r.Headers.Set("Cache-Control", "max-age=0")
 		r.Headers.Set("Connection", "keep-alive")
+		r.Headers.Set("DNT", "1")
+		r.Headers.Set("Pragma", "no-cache")
+		r.Headers.Set("Sec-Fetch-Dest", "document")
+		r.Headers.Set("Sec-Fetch-Mode", "navigate")
+		r.Headers.Set("Sec-Fetch-Site", "none")
+		r.Headers.Set("Sec-Fetch-User", "?1")
+		r.Headers.Set("Sec-CH-UA", `"Chromium";v="125", "Google Chrome";v="125", "Not.A/Brand";v="99"`)
+		r.Headers.Set("Sec-CH-UA-Mobile", "?0")
+		r.Headers.Set("Sec-CH-UA-Platform", `"Windows"`)
 		r.Headers.Set("Upgrade-Insecure-Requests", "1")
 	})
 
@@ -72,7 +81,9 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	var leaksMutex sync.Mutex
 	var insightMutex sync.Mutex
 	var routesMutex sync.Mutex
+	var techMutex sync.Mutex
 	routeSet := make(map[string]struct{})
+	techSet := make(map[string]struct{})
 	baseTarget := mustParseURL(targetURL)
 	var wg sync.WaitGroup
 
@@ -91,7 +102,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		defer wg.Done()
 		req, err := http.NewRequest("HEAD", targetURL, nil)
 		if err == nil {
-			req.Header.Set("User-Agent", "Mozilla/5.0")
+			applyBrowserHeaders(req)
 			client := &http.Client{Timeout: 5 * time.Second}
 			if resp, err := client.Do(req); err == nil {
 				insightMutex.Lock()
@@ -166,8 +177,9 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	c.OnHTML("div[id=__next]", func(e *colly.HTMLElement) {
 		insightMutex.Lock()
 		defer insightMutex.Unlock()
-		insight.Frontend = "React (Next.js)"
 		insight.SPA = "Yes"
+		addTech("Next.js", techSet, &techMutex)
+		addTech("React", techSet, &techMutex)
 	})
 
 	c.OnHTML("div[id=root], div[id=app], script[type=module]", func(e *colly.HTMLElement) {
@@ -201,30 +213,37 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 
 		// Tech Insights from script paths
 		if src != "" {
+			addTechFromURL(src, techSet, &techMutex)
 			insightMutex.Lock()
 			if strings.Contains(src, "/_next/") {
-				insight.Frontend = "React (Next.js)"
 				insight.SPA = "Yes"
+				addTech("Next.js", techSet, &techMutex)
+				addTech("React", techSet, &techMutex)
 			} else if strings.Contains(src, "/_nuxt/") {
-				insight.Frontend = "Vue.js (Nuxt)"
 				insight.SPA = "Yes"
+				addTech("Nuxt.js", techSet, &techMutex)
+				addTech("Vue.js", techSet, &techMutex)
 			} else if strings.Contains(src, "wp-includes") || strings.Contains(src, "wp-content") {
 				insight.CMS = "WordPress"
 				insight.Backend = "PHP (WordPress)"
+				addTech("WordPress", techSet, &techMutex)
 			}
 			insightMutex.Unlock()
 		}
 
 		if src == "" && !informativeOnly {
-			// Inline script
+			// Inline script (secret scan mode only)
 			content := e.Text
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				analyzeContent(e.Request.URL.String(), []byte(content), &leaks, &leaksMutex)
 			}()
-		} else if src != "" && !informativeOnly {
-			// External script
+			return
+		}
+
+		// External script: always fetch so informative mode can fingerprint tech.
+		if src != "" {
 			absURL := e.Request.AbsoluteURL(src)
 			if absURL != "" {
 				e.Request.Visit(absURL)
@@ -267,6 +286,12 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		insightMutex.Unlock()
 
 		ctype := r.Headers.Get("Content-Type")
+		// Fingerprint frontend technologies from URL + content.
+		if r.Request != nil && r.Request.URL != nil {
+			addTechFromURL(r.Request.URL.Path, techSet, &techMutex)
+		}
+		addTechFromBody(ctype, r.Body, techSet, &techMutex)
+
 		if strings.Contains(ctype, "text/html") && baseTarget != nil && r.Request.URL != nil && r.Request.URL.Host == baseTarget.Host {
 			classification := classifySPAFromHTML(r.Body)
 			if classification != "" {
@@ -306,8 +331,129 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	sort.Strings(insight.JWTIndicators)
 	insight.Routes = sortedRoutes(routeSet)
 	insight.PWA = classifyPWA(insight.Routes)
+	front := sortedTech(techSet)
+	if len(front) > 0 {
+		insight.Frontend = strings.Join(front, ", ")
+	}
+	if insight.Frontend == "" && strings.EqualFold(insight.CMS, "WordPress") {
+		insight.Frontend = "WordPress"
+	}
 
 	return leaks, insight
+}
+
+func addTech(name string, techSet map[string]struct{}, mu *sync.Mutex) {
+	if name == "" {
+		return
+	}
+	mu.Lock()
+	techSet[name] = struct{}{}
+	mu.Unlock()
+}
+
+func sortedTech(techSet map[string]struct{}) []string {
+	if len(techSet) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(techSet))
+	for k := range techSet {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func addTechFromURL(path string, techSet map[string]struct{}, mu *sync.Mutex) {
+	p := strings.ToLower(path)
+	switch {
+	case strings.Contains(p, "/_next/"):
+		addTech("Next.js", techSet, mu)
+		addTech("React", techSet, mu)
+	case strings.Contains(p, "/_nuxt/"):
+		addTech("Nuxt.js", techSet, mu)
+		addTech("Vue.js", techSet, mu)
+	case strings.Contains(p, "/@vite/") || strings.Contains(p, "vite") || strings.Contains(p, "registersw.js"):
+		addTech("Vite", techSet, mu)
+	case strings.Contains(p, "/astro") || strings.Contains(p, "astro"):
+		addTech("Astro", techSet, mu)
+	case strings.Contains(p, "remix"):
+		addTech("Remix", techSet, mu)
+	case strings.Contains(p, "alpine"):
+		addTech("Alpine.js", techSet, mu)
+	case strings.Contains(p, "svelte"):
+		addTech("Svelte", techSet, mu)
+	case strings.Contains(p, "solid"):
+		addTech("SolidJS", techSet, mu)
+	case strings.Contains(p, "angular"):
+		addTech("Angular", techSet, mu)
+	case strings.Contains(p, "ember"):
+		addTech("Ember.js", techSet, mu)
+	case strings.Contains(p, "backbone"):
+		addTech("Backbone.js", techSet, mu)
+	case strings.Contains(p, "wp-content") || strings.Contains(p, "wp-includes"):
+		addTech("WordPress", techSet, mu)
+	case strings.Contains(p, "cdn.shopify.com") || strings.Contains(p, "/shopify") || strings.Contains(p, "shopify"):
+		addTech("Shopify", techSet, mu)
+	}
+}
+
+func addTechFromBody(contentType string, body []byte, techSet map[string]struct{}, mu *sync.Mutex) {
+	ct := strings.ToLower(contentType)
+	// Only scan likely text-like bodies.
+	if !(strings.Contains(ct, "html") || strings.Contains(ct, "javascript") || strings.Contains(ct, "json") || strings.Contains(ct, "text/")) {
+		return
+	}
+	s := strings.ToLower(string(body))
+
+	// Framework-specific signatures (best-effort heuristics).
+	if strings.Contains(s, "/@vite/client") || strings.Contains(s, "vite") && strings.Contains(s, "import.meta") {
+		addTech("Vite", techSet, mu)
+	}
+	if strings.Contains(s, "data-astro-cid") || strings.Contains(s, "astro-island") || strings.Contains(s, "astro:page-load") {
+		addTech("Astro", techSet, mu)
+	}
+	if strings.Contains(s, "__nuxt__") || strings.Contains(s, "nuxt") && strings.Contains(s, "/_nuxt/") {
+		addTech("Nuxt.js", techSet, mu)
+		addTech("Vue.js", techSet, mu)
+	}
+	if strings.Contains(s, "/_next/") || strings.Contains(s, "__next_data__") {
+		addTech("Next.js", techSet, mu)
+		addTech("React", techSet, mu)
+	}
+	if strings.Contains(s, `from "react"`) || strings.Contains(s, `from 'react'`) || strings.Contains(s, `require("react")`) || strings.Contains(s, `require('react')`) ||
+		strings.Contains(s, "react-dom") || strings.Contains(s, "react.createelement") || strings.Contains(s, "jsxruntime") {
+		addTech("React", techSet, mu)
+	}
+	if strings.Contains(s, "__vue__") || strings.Contains(s, "createapp(") && strings.Contains(s, "vue") {
+		addTech("Vue.js", techSet, mu)
+	}
+	if strings.Contains(s, "ng-version") || strings.Contains(s, "angular") && strings.Contains(s, "zone.js") {
+		addTech("Angular", techSet, mu)
+	}
+	if strings.Contains(s, "svelte/internal") || strings.Contains(s, "svelte") && strings.Contains(s, "hydration") {
+		addTech("Svelte", techSet, mu)
+	}
+	if strings.Contains(s, "solid-js") || strings.Contains(s, "createsignal") {
+		addTech("SolidJS", techSet, mu)
+	}
+	if strings.Contains(s, "alpinejs") || strings.Contains(s, "x-data") || strings.Contains(s, "x-init") {
+		addTech("Alpine.js", techSet, mu)
+	}
+	if strings.Contains(s, "__remixcontext") || strings.Contains(s, "data-remix") {
+		addTech("Remix", techSet, mu)
+	}
+	if strings.Contains(s, "ember") && (strings.Contains(s, "emberenv") || strings.Contains(s, "ember-view")) {
+		addTech("Ember.js", techSet, mu)
+	}
+	if strings.Contains(s, "backbone.model") || strings.Contains(s, "backbone.view") {
+		addTech("Backbone.js", techSet, mu)
+	}
+	if strings.Contains(s, "wp-content") || strings.Contains(s, "wp-includes") || strings.Contains(s, "wordpress") {
+		addTech("WordPress", techSet, mu)
+	}
+	if strings.Contains(s, "cdn.shopify.com") || strings.Contains(s, "shopify.theme") || strings.Contains(s, "shopify.shop") || strings.Contains(s, "window.shopify") || strings.Contains(s, "myshopify.com") || strings.Contains(s, "shopify-checkout-api-token") || strings.Contains(s, "x-shopify-stage") {
+		addTech("Shopify", techSet, mu)
+	}
 }
 
 func classifyPWA(routes []string) string {
@@ -441,7 +587,7 @@ func fetchRouteResponse(client *http.Client, baseURL *url.URL, path string) (str
 	if err != nil {
 		return "", nil, 0, nil
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0")
+	applyBrowserHeaders(req)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", nil, 0, nil
@@ -1053,7 +1199,7 @@ func fetchOptionalWithType(base, p string) (string, string, bool) {
 	if err != nil {
 		return "", "", false
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0")
+	applyBrowserHeaders(req)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -1081,4 +1227,22 @@ func mustParseURL(raw string) *url.URL {
 		return nil
 	}
 	return u
+}
+
+func applyBrowserHeaders(req *http.Request) {
+	// A conservative Chrome-like header set (no cookies by default).
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Cache-Control", "max-age=0")
+	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("DNT", "1")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
+	req.Header.Set("Sec-CH-UA", `"Chromium";v="125", "Google Chrome";v="125", "Not.A/Brand";v="99"`)
+	req.Header.Set("Sec-CH-UA-Mobile", "?0")
+	req.Header.Set("Sec-CH-UA-Platform", `"Windows"`)
 }

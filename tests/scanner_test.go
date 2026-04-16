@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"surisc/internal/models"
@@ -103,6 +104,9 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 			})
 			w.Header().Set("Content-Type", "text/plain")
 			fmt.Fprint(w, "ok")
+		case "/assets/app.js":
+			w.Header().Set("Content-Type", "application/javascript")
+			fmt.Fprint(w, `import React from "react"; import { createApp } from "vue"; console.log("solid-js"); window.Shopify = { shop: "demo.myshopify.com" };`)
 		case "/api", "/auth", "/dashboard", "/graphql", "/__surisc_nonexistent_route_probe__":
 			w.Header().Set("Content-Type", "text/html")
 			fmt.Fprint(w, "<html><body>spa fallback</body></html>")
@@ -133,6 +137,7 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 					</head>
 					<body>
 						<div id="root"></div>
+						<script type="module" src="/@vite/client"></script>
 						<a href="/about">About</a>
 						<a href="/docs/getting-started">Docs</a>
 						<form action="/auth/login"></form>
@@ -176,6 +181,9 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 	}
 	if insight.PWA == "" || insight.PWA == "No" {
 		t.Fatalf("expected PWA to be detected, got %q", insight.PWA)
+	}
+	if insight.Frontend == "" || !strings.Contains(insight.Frontend, "Vite") || !strings.Contains(insight.Frontend, "React") || !strings.Contains(insight.Frontend, "Shopify") {
+		t.Fatalf("expected frontend summary to include Vite and React, got %q", insight.Frontend)
 	}
 	if insight.ContentSecurityPolicy == "" {
 		t.Fatalf("expected Content-Security-Policy to be detected")
