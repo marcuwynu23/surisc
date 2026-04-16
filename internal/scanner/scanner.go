@@ -47,6 +47,7 @@ var (
 	rxRouteLiteral     = regexp.MustCompile(`["'](\/[A-Za-z0-9._~!$&()*+,;=:@%\-\/]*)["']`)
 	rxAbsoluteURL      = regexp.MustCompile(`https?://[A-Za-z0-9\.\-]+(?:\:[0-9]+)?\/[A-Za-z0-9._~!$&()*+,;=:@%\-\/]*`)
 	rxJWTLike          = regexp.MustCompile(`^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$`)
+	rxWhitespace       = regexp.MustCompile(`\s+`)
 )
 
 func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.TechInsight) {
@@ -372,35 +373,29 @@ func probeAttackSurfaceRoutes(base string, paths []string) attackSurfaceProbeRes
 	results := make([]string, 0, len(paths))
 	existingPaths := make([]string, 0, len(paths))
 	var insight models.TechInsight
-	fallbackSig := fetchRouteSignature(client, baseURL, "/__surisc_nonexistent_route_probe__")
+	homeCT, homeBody, _, _ := fetchRouteResponse(client, baseURL, "/")
+	homeNormSig := normalizedResponseSignature(homeCT, homeBody, paths)
+	fallbackCT, fallbackBody, _, _ := fetchRouteResponse(client, baseURL, "/__surisc_nonexistent_route_probe__")
+	fallbackNormSig := normalizedResponseSignature(fallbackCT, fallbackBody, paths)
 
 	for _, p := range paths {
-		ref, err := url.Parse(p)
-		if err != nil {
-			continue
-		}
-		u := baseURL.ResolveReference(ref).String()
-		req, err := http.NewRequest("GET", u, nil)
-		if err != nil {
-			continue
-		}
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-
-		resp, err := client.Do(req)
-		if err != nil {
+		ctype, body, statusCode, cookies := fetchRouteResponse(client, baseURL, p)
+		if statusCode == 0 {
 			results = append(results, fmt.Sprintf("%s -> request error", p))
 			continue
 		}
-		mergeCookieInsights(resp.Cookies(), &insight)
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
-		_ = resp.Body.Close()
-
-		if resp.StatusCode < 400 {
-			sig := responseSignature(resp.Header.Get("Content-Type"), body)
-			if fallbackSig != "" && sig == fallbackSig {
+		mergeCookieInsights(cookies, &insight)
+		if statusCode < 400 {
+			normalizedSig := normalizedResponseSignature(ctype, body, paths)
+			if isLikelyFallbackResponse(ctype, normalizedSig, homeNormSig, fallbackNormSig) {
 				continue
 			}
-			results = append(results, fmt.Sprintf("%s -> %d", p, resp.StatusCode))
+			// Be conservative: 200 HTML on probed admin/api/auth paths is often SPA fallback.
+			// Only keep 200 responses when they are non-HTML and more likely endpoint-specific.
+			if statusCode == 200 && strings.Contains(strings.ToLower(ctype), "html") {
+				continue
+			}
+			results = append(results, fmt.Sprintf("%s -> %d", p, statusCode))
 			existingPaths = append(existingPaths, p)
 		}
 	}
@@ -414,24 +409,24 @@ func probeAttackSurfaceRoutes(base string, paths []string) attackSurfaceProbeRes
 	}
 }
 
-func fetchRouteSignature(client *http.Client, baseURL *url.URL, path string) string {
+func fetchRouteResponse(client *http.Client, baseURL *url.URL, path string) (string, []byte, int, []*http.Cookie) {
 	ref, err := url.Parse(path)
 	if err != nil {
-		return ""
+		return "", nil, 0, nil
 	}
 	u := baseURL.ResolveReference(ref).String()
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return ""
+		return "", nil, 0, nil
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 	resp, err := client.Do(req)
 	if err != nil {
-		return ""
+		return "", nil, 0, nil
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
-	return responseSignature(resp.Header.Get("Content-Type"), body)
+	return resp.Header.Get("Content-Type"), body, resp.StatusCode, resp.Cookies()
 }
 
 func responseSignature(contentType string, body []byte) string {
@@ -439,6 +434,38 @@ func responseSignature(contentType string, body []byte) string {
 	_, _ = h.Write([]byte(strings.ToLower(contentType)))
 	_, _ = h.Write(body)
 	return fmt.Sprintf("%x", h.Sum64())
+}
+
+func normalizedResponseSignature(contentType string, body []byte, probePaths []string) string {
+	normalized := normalizeBodyForComparison(string(body), probePaths)
+	return responseSignature(strings.ToLower(contentType), []byte(normalized))
+}
+
+func normalizeBodyForComparison(body string, probePaths []string) string {
+	s := strings.ToLower(body)
+	s = rxAbsoluteURL.ReplaceAllString(s, "")
+	for _, p := range probePaths {
+		s = strings.ReplaceAll(s, strings.ToLower(p), "")
+	}
+	s = rxWhitespace.ReplaceAllString(s, " ")
+	return strings.TrimSpace(s)
+}
+
+func isLikelyFallbackResponse(contentType, sig, homeSig, missingSig string) bool {
+	ct := strings.ToLower(contentType)
+	if !strings.Contains(ct, "html") {
+		return false
+	}
+	if sig == "" {
+		return false
+	}
+	if homeSig != "" && sig == homeSig {
+		return true
+	}
+	if missingSig != "" && sig == missingSig {
+		return true
+	}
+	return false
 }
 
 func cookiesFromHeader(h *http.Header) []*http.Cookie {
