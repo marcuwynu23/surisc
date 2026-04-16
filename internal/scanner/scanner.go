@@ -195,6 +195,11 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		}
 	})
 
+	// Alpine.js frequently uses x-* attributes directly in HTML templates.
+	c.OnHTML("[x-data], [x-init], [x-show], [x-model], [x-bind], [x-cloak], [x-transition], [x-ref], [x-text], [x-html]", func(e *colly.HTMLElement) {
+		addTech("Alpine.js", techSet, &techMutex)
+	})
+
 	// Collect route hints from common HTML attributes.
 	c.OnHTML("a[href], link[href], script[src], img[src], form[action]", func(e *colly.HTMLElement) {
 		var ref string
@@ -388,6 +393,7 @@ func ensureVanillaFrontend(front []string) []string {
 		"Angular":     {},
 		"Svelte":      {},
 		"SolidJS":     {},
+		"Alpine.js":   {},
 		"Next.js":     {},
 		"Nuxt.js":     {},
 		"Remix":       {},
@@ -703,7 +709,14 @@ func addTechFromBody(contentType string, body []byte, techSet map[string]struct{
 	if strings.Contains(s, "solid-js") || strings.Contains(s, "createsignal") {
 		addTech("SolidJS", techSet, mu)
 	}
-	if strings.Contains(s, "alpinejs") || strings.Contains(s, "x-data") || strings.Contains(s, "x-init") {
+	if strings.Contains(s, "alpinejs") ||
+		strings.Contains(s, "x-data") ||
+		strings.Contains(s, "x-init") ||
+		strings.Contains(s, "x-show") ||
+		strings.Contains(s, "x-model") ||
+		strings.Contains(s, "x-bind:") ||
+		strings.Contains(s, "x-on:") ||
+		strings.Contains(s, "@click") {
 		addTech("Alpine.js", techSet, mu)
 	}
 	if strings.Contains(s, "__remixcontext") || strings.Contains(s, "data-remix") {
