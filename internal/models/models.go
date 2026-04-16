@@ -34,14 +34,18 @@ type Leak struct {
 }
 
 type TechInsight struct {
-	Backend    string `json:"backend,omitempty"`
-	Frontend   string `json:"frontend,omitempty"`
-	Server     string `json:"server,omitempty"`
-	CDNWAF     string `json:"cdn_waf,omitempty"`
-	CMS        string `json:"cms,omitempty"`
-	Protocol   string `json:"protocol,omitempty"`
-	SPA        string `json:"spa,omitempty"`
-	Routes     []string `json:"routes,omitempty"`
-	RobotsTxt  string `json:"robots_txt,omitempty"`
-	SitemapXML string `json:"sitemap_xml,omitempty"`
+	Backend               string   `json:"backend,omitempty"`
+	Frontend              string   `json:"frontend,omitempty"`
+	Server                string   `json:"server,omitempty"`
+	CDNWAF                string   `json:"cdn_waf,omitempty"`
+	CMS                   string   `json:"cms,omitempty"`
+	Protocol              string   `json:"protocol,omitempty"`
+	SPA                   string   `json:"spa,omitempty"`
+	ContentSecurityPolicy string   `json:"content_security_policy,omitempty"`
+	XFrameOptions         string   `json:"x_frame_options,omitempty"`
+	StrictTransportSecurity string `json:"strict_transport_security,omitempty"`
+	AccessControlAllowOrigin string `json:"access_control_allow_origin,omitempty"`
+	Routes                []string `json:"routes,omitempty"`
+	RobotsTxt             string   `json:"robots_txt,omitempty"`
+	SitemapXML            string   `json:"sitemap_xml,omitempty"`
 }

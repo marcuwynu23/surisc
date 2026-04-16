@@ -94,12 +94,24 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/robots.txt":
+			w.Header().Set("Content-Security-Policy", "default-src 'self'")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Content-Type", "text/plain")
 			fmt.Fprint(w, "User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: "+ts.URL+"/sitemap.xml\n")
 		case "/sitemap.xml":
+			w.Header().Set("Content-Security-Policy", "default-src 'self'")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Content-Type", "application/xml")
 			fmt.Fprintf(w, `<urlset><url><loc>%s/about</loc></url><url><loc>%s/docs/getting-started</loc></url></urlset>`, ts.URL, ts.URL)
 		default:
+			w.Header().Set("Content-Security-Policy", "default-src 'self'")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Content-Type", "text/html")
 			fmt.Fprint(w, `
 				<html>
@@ -142,5 +154,17 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 	}
 	if insight.SPA == "" || insight.SPA == "No" {
 		t.Fatalf("expected SPA to be detected, got %q", insight.SPA)
+	}
+	if insight.ContentSecurityPolicy == "" {
+		t.Fatalf("expected Content-Security-Policy to be detected")
+	}
+	if insight.XFrameOptions == "" {
+		t.Fatalf("expected X-Frame-Options to be detected")
+	}
+	if insight.StrictTransportSecurity == "" {
+		t.Fatalf("expected Strict-Transport-Security to be detected")
+	}
+	if insight.AccessControlAllowOrigin == "" {
+		t.Fatalf("expected Access-Control-Allow-Origin to be detected")
 	}
 }
