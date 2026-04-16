@@ -107,6 +107,9 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 			if resp, err := client.Do(req); err == nil {
 				insightMutex.Lock()
 				insight.Protocol = resp.Proto
+				if insight.Hosting == "" {
+					insight.Hosting = detectHostingProvider(baseTarget, resp.Request.URL, resp.Header, nil)
+				}
 				if insight.ContentSecurityPolicy == "" {
 					insight.ContentSecurityPolicy = resp.Header.Get("Content-Security-Policy")
 				}
@@ -258,6 +261,9 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	c.OnResponse(func(r *colly.Response) {
 		// Tech Insights from Headers
 		insightMutex.Lock()
+		if detected := detectHostingProvider(baseTarget, r.Request.URL, *r.Headers, r.Body); shouldUpgradeHosting(insight.Hosting, detected) {
+			insight.Hosting = detected
+		}
 		if insight.Server == "" && r.Headers.Get("Server") != "" {
 			insight.Server = r.Headers.Get("Server")
 		}
@@ -364,6 +370,222 @@ func sortedTech(techSet map[string]struct{}) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func detectHostingProvider(baseTarget, requestURL *url.URL, headers http.Header, body []byte) string {
+	getHeaderLower := func(name string) string {
+		return strings.ToLower(strings.TrimSpace(headers.Get(name)))
+	}
+	server := getHeaderLower("Server")
+	via := getHeaderLower("Via")
+
+	host := ""
+	if requestURL != nil && requestURL.Hostname() != "" {
+		host = strings.ToLower(requestURL.Hostname())
+	} else if baseTarget != nil {
+		host = strings.ToLower(baseTarget.Hostname())
+	}
+
+	type candidate struct {
+		name  string
+		score int
+	}
+	best := candidate{}
+	add := func(name string, score int) {
+		if score > best.score {
+			best = candidate{name: name, score: score}
+		}
+	}
+	headerExists := func(name string) bool {
+		return strings.TrimSpace(headers.Get(name)) != ""
+	}
+	hostHas := func(suffix string) bool {
+		return host != "" && (host == suffix || strings.HasSuffix(host, "."+suffix))
+	}
+
+	// Vercel
+	if headerExists("X-Vercel-Id") || headerExists("X-Vercel-Cache") || strings.Contains(server, "vercel") || hostHas("vercel.app") {
+		score := 80
+		if headerExists("X-Vercel-Id") {
+			score = 100
+		}
+		add("Vercel", score)
+	}
+	// Netlify
+	if headerExists("X-Nf-Request-Id") || strings.Contains(server, "netlify") || hostHas("netlify.app") {
+		score := 80
+		if headerExists("X-Nf-Request-Id") {
+			score = 100
+		}
+		add("Netlify", score)
+	}
+	// Heroku
+	if strings.Contains(via, "vegur") || strings.Contains(server, "heroku") || hostHas("herokuapp.com") {
+		score := 85
+		if strings.Contains(via, "vegur") {
+			score = 100
+		}
+		add("Heroku", score)
+	}
+	// Railway
+	if headerExists("X-Railway-Request-Id") || strings.Contains(server, "railway") || hostHas("railway.app") || hostHas("up.railway.app") {
+		score := 85
+		if headerExists("X-Railway-Request-Id") {
+			score = 100
+		}
+		add("Railway", score)
+	}
+	isCloudflareEdge := headerExists("CF-Ray") || strings.Contains(server, "cloudflare")
+	// Cloudflare Workers
+	if hostHas("workers.dev") || headerExists("CF-Worker") {
+		add("Cloudflare Workers", 100)
+	}
+	// Cloudflare Pages (host + code/header signatures)
+	if hostHas("pages.dev") || hasCloudflarePagesHeaderSignal(headers) || hasCloudflarePagesCodeSignal(body) {
+		add("Cloudflare Pages", 100)
+	} else if isCloudflareEdge {
+		// Cloudflare edge detected, but origin platform may still be external (e.g. VPS/origin app).
+		add("Cloudflare Proxied", 88)
+	}
+	// GitHub Pages
+	if strings.Contains(server, "github.com") || headerExists("X-GitHub-Request-Id") || hostHas("github.io") {
+		add("GitHub Pages", 95)
+	}
+	// GitLab Pages
+	if strings.Contains(server, "gitlab") || hostHas("gitlab.io") {
+		add("GitLab Pages", 90)
+	}
+	// Render
+	if strings.Contains(server, "render") || hostHas("onrender.com") {
+		add("Render", 90)
+	}
+	// Fly.io
+	if strings.Contains(server, "fly.io") || headerExists("Fly-Request-Id") || hostHas("fly.dev") {
+		add("Fly.io", 90)
+	}
+	// Firebase Hosting
+	if headerExists("X-Firebase-Request-Id") || hostHas("web.app") || hostHas("firebaseapp.com") {
+		add("Firebase Hosting", 95)
+	}
+	// AWS Amplify
+	if hostHas("amplifyapp.com") {
+		add("AWS Amplify", 95)
+	}
+	// Azure Static Web Apps
+	if hostHas("azurestaticapps.net") || headerExists("X-Azure-Ref") {
+		add("Azure Static Web Apps", 90)
+	}
+	// Surge
+	if strings.Contains(server, "surge") || hostHas("surge.sh") {
+		add("Surge", 90)
+	}
+	// Glitch
+	if hostHas("glitch.me") {
+		add("Glitch", 90)
+	}
+
+	if best.score >= 80 {
+		return best.name
+	}
+	return ""
+}
+
+func hasCloudflarePagesCodeSignal(body []byte) bool {
+	if len(body) == 0 {
+		return false
+	}
+	s := strings.ToLower(string(body))
+	signals := []string{
+		"cloudflare pages",
+		"pages.dev",
+		"deployed on cloudflare pages",
+		"<!-- cloudflare pages -->",
+		`meta name="generator" content="cloudflare pages"`,
+		`meta name='generator' content='cloudflare pages'`,
+	}
+	for _, sig := range signals {
+		if strings.Contains(s, sig) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCloudflarePagesHeaderSignal(headers http.Header) bool {
+	getLower := func(name string) string {
+		return strings.ToLower(strings.TrimSpace(headers.Get(name)))
+	}
+	isCloudflareEdge := getLower("cf-ray") != "" || strings.Contains(getLower("server"), "cloudflare")
+	if !isCloudflareEdge {
+		return false
+	}
+
+	// Strong signal for deployed static apps on Cloudflare edge.
+	if strings.Contains(getLower("x-powered-by"), "cloudflare pages") {
+		return true
+	}
+
+	// If origin fingerprints are present, prefer "Cloudflare Proxied".
+	if hasOriginServerFingerprint(headers) {
+		return false
+	}
+
+	score := 0
+	if strings.Contains(getLower("cache-control"), "must-revalidate") && strings.Contains(getLower("cache-control"), "max-age=0") {
+		score++
+	}
+	if strings.Contains(getLower("speculation-rules"), "/cdn-cgi/speculation") {
+		score++
+	}
+	if getLower("cf-cache-status") != "" {
+		score++
+	}
+	if strings.Contains(getLower("strict-transport-security"), "preload") {
+		score++
+	}
+
+	return score >= 3
+}
+
+func hasOriginServerFingerprint(headers http.Header) bool {
+	xPoweredBy := strings.ToLower(strings.TrimSpace(headers.Get("X-Powered-By")))
+	if xPoweredBy != "" && !strings.Contains(xPoweredBy, "cloudflare pages") {
+		return true
+	}
+	originHeaders := []string{
+		"X-Generator",
+		"X-Drupal-Cache",
+		"X-AspNet-Version",
+		"X-AspNetMvc-Version",
+		"X-Pingback",
+	}
+	for _, h := range originHeaders {
+		if strings.TrimSpace(headers.Get(h)) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func shouldUpgradeHosting(current, next string) bool {
+	if next == "" {
+		return false
+	}
+	if current == "" {
+		return true
+	}
+	return hostingRank(next) > hostingRank(current)
+}
+
+func hostingRank(hosting string) int {
+	switch hosting {
+	case "Cloudflare Workers", "Cloudflare Pages":
+		return 100
+	case "Cloudflare Proxied":
+		return 70
+	default:
+		return 90
+	}
 }
 
 func addTechFromURL(path string, techSet map[string]struct{}, mu *sync.Mutex) {

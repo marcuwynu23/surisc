@@ -235,6 +235,117 @@ func TestRunScanInformativeSkipsDataScriptSrc(t *testing.T) {
 	}
 }
 
+func TestRunScanInformativeDetectsHostingProviderVercel(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Vercel-Id", "sin1::abc123")
+		w.Header().Set("Server", "Vercel")
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><body><div id="root"></div></body></html>`)
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if insight.Hosting != "Vercel" {
+		t.Fatalf("expected hosting provider Vercel, got %q", insight.Hosting)
+	}
+}
+
+func TestRunScanInformativeDetectsHostingProviderHeroku(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Via", "1.1 vegur")
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><body><div id="root"></div></body></html>`)
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if insight.Hosting != "Heroku" {
+		t.Fatalf("expected hosting provider Heroku, got %q", insight.Hosting)
+	}
+}
+
+func TestRunScanInformativeDetectsHostingProviderRailway(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Railway-Request-Id", "req_123")
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><body><div id="root"></div></body></html>`)
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if insight.Hosting != "Railway" {
+		t.Fatalf("expected hosting provider Railway, got %q", insight.Hosting)
+	}
+}
+
+func TestRunScanInformativeDetectsCloudflareProxiedHosting(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Server", "cloudflare")
+		w.Header().Set("CF-Ray", "abc123-SIN")
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><body><div id="root"></div></body></html>`)
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if insight.Hosting != "Cloudflare Proxied" {
+		t.Fatalf("expected cloudflare proxied hosting label, got %q", insight.Hosting)
+	}
+}
+
+func TestRunScanInformativeDetectsCloudflarePagesByCodeSignal(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Server", "cloudflare")
+		w.Header().Set("CF-Ray", "abc123-SIN")
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><head><meta name="generator" content="Cloudflare Pages"></head><body><div id="root"></div></body></html>`)
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if insight.Hosting != "Cloudflare Pages" {
+		t.Fatalf("expected Cloudflare Pages from code signal, got %q", insight.Hosting)
+	}
+}
+
+func TestRunScanInformativeDetectsCloudflarePagesByHeaderPattern(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Server", "cloudflare")
+		w.Header().Set("CF-Ray", "9ed2708adfb62ae3-LAX")
+		w.Header().Set("CF-Cache-Status", "DYNAMIC")
+		w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
+		w.Header().Set("Speculation-Rules", `"/cdn-cgi/speculation"`)
+		w.Header().Set("Strict-Transport-Security", "max-age=15552000; includeSubDomains; preload")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, `<html><body><div id="root"></div></body></html>`)
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if insight.Hosting != "Cloudflare Pages" {
+		t.Fatalf("expected Cloudflare Pages from header pattern, got %q", insight.Hosting)
+	}
+}
+
+func TestRunScanInformativeKeepsCloudflareProxiedWhenOriginFingerprintPresent(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Server", "cloudflare")
+		w.Header().Set("CF-Ray", "9ed271270dd1f7e3-LAX")
+		w.Header().Set("CF-Cache-Status", "DYNAMIC")
+		w.Header().Set("X-Powered-By", "PHP/7.4")
+		w.Header().Set("X-Drupal-Cache", "MISS")
+		w.Header().Set("X-Generator", "Drupal 7 (http://drupal.org)")
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><body><div id="root"></div></body></html>`)
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if insight.Hosting != "Cloudflare Proxied" {
+		t.Fatalf("expected Cloudflare Proxied with origin fingerprint, got %q", insight.Hosting)
+	}
+}
+
 func TestRunScanInformativeIgnoresHTMLFallbackForRobotsAndSitemap(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
