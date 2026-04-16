@@ -346,6 +346,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	insight.Routes = sortedRoutes(routeSet)
 	insight.PWA = classifyPWA(insight.Routes)
 	front := sortedTech(techSet)
+	front = ensureVanillaFrontend(front)
 	if len(front) > 0 {
 		insight.Frontend = strings.Join(front, ", ")
 	}
@@ -373,6 +374,42 @@ func sortedTech(techSet map[string]struct{}) []string {
 	for k := range techSet {
 		out = append(out, k)
 	}
+	sort.Strings(out)
+	return out
+}
+
+func ensureVanillaFrontend(front []string) []string {
+	if len(front) == 0 {
+		return []string{"Vanilla JS"}
+	}
+	frameworks := map[string]struct{}{
+		"React":       {},
+		"Vue.js":      {},
+		"Angular":     {},
+		"Svelte":      {},
+		"SolidJS":     {},
+		"Next.js":     {},
+		"Nuxt.js":     {},
+		"Remix":       {},
+		"Astro":       {},
+		"Ember.js":    {},
+		"Backbone.js": {},
+	}
+	hasFramework := false
+	hasVanilla := false
+	for _, t := range front {
+		if t == "Vanilla JS" {
+			hasVanilla = true
+		}
+		if _, ok := frameworks[t]; ok {
+			hasFramework = true
+		}
+	}
+	if hasFramework || hasVanilla {
+		return front
+	}
+	out := append([]string{}, front...)
+	out = append(out, "Vanilla JS")
 	sort.Strings(out)
 	return out
 }

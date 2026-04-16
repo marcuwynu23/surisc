@@ -401,6 +401,47 @@ func TestRunScanInformativeFiltersTemplateAndFilesystemRoutes(t *testing.T) {
 	}
 }
 
+func TestRunScanInformativeMarksVanillaWhenNoMajorFramework(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/robots.txt":
+			w.Header().Set("Content-Type", "text/plain")
+			fmt.Fprint(w, "User-agent: *\nAllow: /\n")
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<html><body><h1>Plain HTML page</h1></body></html>`)
+		}
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if !strings.Contains(insight.Frontend, "Vanilla JS") {
+		t.Fatalf("expected Vanilla JS frontend fallback, got %q", insight.Frontend)
+	}
+}
+
+func TestRunScanInformativeAddsVanillaForAlpineOnly(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/assets/app.js":
+			w.Header().Set("Content-Type", "application/javascript")
+			fmt.Fprint(w, `document.querySelector('[x-data]')`)
+		case "/robots.txt":
+			w.Header().Set("Content-Type", "text/plain")
+			fmt.Fprint(w, "User-agent: *\nAllow: /\n")
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<html><body><div x-data="{ open: false }"></div><script src="/assets/app.js"></script></body></html>`)
+		}
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if !strings.Contains(insight.Frontend, "Alpine.js") || !strings.Contains(insight.Frontend, "Vanilla JS") {
+		t.Fatalf("expected Alpine.js and Vanilla JS, got %q", insight.Frontend)
+	}
+}
+
 func TestRunScanInformativeIgnoresHTMLFallbackForRobotsAndSitemap(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
