@@ -30,3 +30,14 @@ func TestValidateTargetReachable_ClosedServerErrors(t *testing.T) {
 	}
 }
 
+func TestValidateTargetReachable_Status5xxErrors(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer ts.Close()
+
+	if err := ValidateTargetReachable(ts.URL); err == nil {
+		t.Fatalf("expected error for non-active 5xx target")
+	}
+}
+

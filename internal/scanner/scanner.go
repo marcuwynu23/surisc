@@ -374,16 +374,16 @@ func ValidateTargetReachable(targetURL string) error {
 
 	client := newScannerHTTPClient()
 
-	// Try HEAD first (cheap). Some servers block HEAD; treat that as reachable.
+	// Try HEAD first (cheap), but do not treat it as authoritative reachability.
+	// Some targets answer HEAD while failing GET due to edge/origin issues.
 	if req, err := http.NewRequest("HEAD", targetURL, nil); err == nil {
 		applyBrowserHeaders(req)
 		if resp, err := client.Do(req); err == nil {
 			_ = resp.Body.Close()
-			return nil
 		}
 	}
 
-	// Fallback to GET with Range to keep it light.
+	// Use GET with Range to keep payload light and confirm the endpoint is truly usable.
 	req, err := http.NewRequest("GET", targetURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -395,6 +395,9 @@ func ValidateTargetReachable(targetURL string) error {
 		return fmt.Errorf("target unreachable: %w", err)
 	}
 	_ = resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		return fmt.Errorf("target is not active: http status %d", resp.StatusCode)
+	}
 	return nil
 }
 
