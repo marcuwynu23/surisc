@@ -128,11 +128,15 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 			w.Header().Set("Content-Type", "text/html")
 			fmt.Fprint(w, `
 				<html>
+					<head>
+						<link rel="manifest" href="/manifest.webmanifest" />
+					</head>
 					<body>
 						<div id="root"></div>
 						<a href="/about">About</a>
 						<a href="/docs/getting-started">Docs</a>
 						<form action="/auth/login"></form>
+						<script src="/registerSW.js"></script>
 						<script src="/assets/app.js"></script>
 						<script>const api = "/api/v1/users";</script>
 					</body>
@@ -153,6 +157,8 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 		"/assets/app.js",
 		"/auth/login",
 		"/docs/getting-started",
+		"/manifest.webmanifest",
+		"/registerSW.js",
 	}
 	for _, route := range expectedRoutes {
 		if !slices.Contains(insight.Routes, route) {
@@ -167,6 +173,9 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 	}
 	if insight.SPA == "" || insight.SPA == "No" {
 		t.Fatalf("expected SPA to be detected, got %q", insight.SPA)
+	}
+	if insight.PWA == "" || insight.PWA == "No" {
+		t.Fatalf("expected PWA to be detected, got %q", insight.PWA)
 	}
 	if insight.ContentSecurityPolicy == "" {
 		t.Fatalf("expected Content-Security-Policy to be detected")
