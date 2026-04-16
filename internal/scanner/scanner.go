@@ -149,7 +149,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 				insight.JWTIndicators = append(insight.JWTIndicators, j)
 			}
 			insightMutex.Unlock()
-			for _, p := range []string{"/admin", "/api", "/auth", "/dashboard", "/graphql"} {
+			for _, p := range probe.existingPaths {
 				addRoute(p, mustParseURL(targetURL), routeSet, &routesMutex)
 			}
 		}()
@@ -358,6 +358,7 @@ func mapKeys(set map[string]struct{}) []string {
 
 type attackSurfaceProbeResult struct {
 	routes        []string
+	existingPaths []string
 	cookies       []string
 	jwtIndicators []string
 }
@@ -369,6 +370,7 @@ func probeAttackSurfaceRoutes(base string, paths []string) attackSurfaceProbeRes
 	}
 	client := &http.Client{Timeout: 5 * time.Second}
 	results := make([]string, 0, len(paths))
+	existingPaths := make([]string, 0, len(paths))
 	var insight models.TechInsight
 	fallbackSig := fetchRouteSignature(client, baseURL, "/__surisc_nonexistent_route_probe__")
 
@@ -399,11 +401,14 @@ func probeAttackSurfaceRoutes(base string, paths []string) attackSurfaceProbeRes
 				continue
 			}
 			results = append(results, fmt.Sprintf("%s -> %d", p, resp.StatusCode))
+			existingPaths = append(existingPaths, p)
 		}
 	}
 	sort.Strings(results)
+	sort.Strings(existingPaths)
 	return attackSurfaceProbeResult{
 		routes:        results,
+		existingPaths: existingPaths,
 		cookies:       insight.CookieSecurity,
 		jwtIndicators: insight.JWTIndicators,
 	}
