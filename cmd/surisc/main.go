@@ -26,6 +26,10 @@ func main() {
 		log.Fatal("Please provide a target URL using the -u flag.")
 	}
 
+	if err := scanner.ValidateTargetReachable(*targetURL); err != nil {
+		log.Fatal(err)
+	}
+
 	leaks, insight := scanner.RunScan(*targetURL, informative)
 
 	if *outputFormat == "json" {
