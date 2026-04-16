@@ -81,8 +81,10 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	var leaksMutex sync.Mutex
 	var insightMutex sync.Mutex
 	var routesMutex sync.Mutex
+	var contentRoutesMutex sync.Mutex
 	var techMutex sync.Mutex
 	routeSet := make(map[string]struct{})
+	contentRouteSet := make(map[string]struct{})
 	techSet := make(map[string]struct{})
 	baseTarget := mustParseURL(targetURL)
 	var wg sync.WaitGroup
@@ -189,7 +191,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		insightMutex.Lock()
 		defer insightMutex.Unlock()
 		if insight.SPA == "" {
-			insight.SPA = "Likely"
+			insight.SPA = "Yes"
 		}
 	})
 
@@ -312,7 +314,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 			}
 		}
 		if strings.Contains(ctype, "javascript") || strings.Contains(ctype, "json") || strings.Contains(ctype, "text/html") || strings.HasSuffix(r.Request.URL.Path, ".js") {
-			extractRoutesFromContent(r.Body, r.Request.URL, routeSet, &routesMutex)
+			extractRoutesFromContent(r.Body, r.Request.URL, contentRouteSet, &contentRoutesMutex)
 		}
 		if !informativeOnly && (strings.Contains(ctype, "javascript") || strings.Contains(ctype, "json") || strings.HasSuffix(r.Request.URL.Path, ".js")) {
 			content := make([]byte, len(r.Body))
@@ -338,6 +340,9 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	}
 	sort.Strings(insight.CookieSecurity)
 	sort.Strings(insight.JWTIndicators)
+	if informativeOnly {
+		mergeValidatedContentRoutes(targetURL, routeSet, contentRouteSet, &routesMutex)
+	}
 	insight.Routes = sortedRoutes(routeSet)
 	insight.PWA = classifyPWA(insight.Routes)
 	front := sortedTech(techSet)
@@ -673,7 +678,7 @@ func addTechFromBody(contentType string, body []byte, techSet map[string]struct{
 	if strings.Contains(s, "backbone.model") || strings.Contains(s, "backbone.view") {
 		addTech("Backbone.js", techSet, mu)
 	}
-	if strings.Contains(s, "wp-content") || strings.Contains(s, "wp-includes") || strings.Contains(s, "wordpress") {
+	if isLikelyWordPressBody(s) {
 		addTech("WordPress", techSet, mu)
 	}
 	if strings.Contains(s, "cdn.shopify.com") || strings.Contains(s, "shopify.theme") || strings.Contains(s, "shopify.shop") || strings.Contains(s, "window.shopify") || strings.Contains(s, "myshopify.com") || strings.Contains(s, "shopify-checkout-api-token") || strings.Contains(s, "x-shopify-stage") {
@@ -883,7 +888,7 @@ func classifySPAFromHTML(body []byte) string {
 	}
 	for _, signal := range positiveSignals {
 		if strings.Contains(html, signal) {
-			return "Likely"
+			return "Yes"
 		}
 	}
 	return "No"
@@ -1292,7 +1297,8 @@ func dedupeLeaks(in []models.Leak) []models.Leak {
 }
 
 func extractRoutesFromContent(content []byte, baseURL *url.URL, routeSet map[string]struct{}, mu *sync.Mutex) {
-	matches := rxRouteLiteral.FindAllSubmatch(content, -1)
+	withoutFencedCode := stripMarkdownFencedCodeBlocks(content)
+	matches := rxRouteLiteral.FindAllSubmatch(withoutFencedCode, -1)
 	for _, m := range matches {
 		if len(m) < 2 {
 			continue
@@ -1300,9 +1306,73 @@ func extractRoutesFromContent(content []byte, baseURL *url.URL, routeSet map[str
 		addRoute(string(m[1]), baseURL, routeSet, mu)
 	}
 
-	absMatches := rxAbsoluteURL.FindAll(content, -1)
+	absMatches := rxAbsoluteURL.FindAll(withoutFencedCode, -1)
 	for _, m := range absMatches {
 		addRoute(string(m), baseURL, routeSet, mu)
+	}
+}
+
+func stripMarkdownFencedCodeBlocks(content []byte) []byte {
+	s := string(content)
+	lines := strings.Split(s, "\n")
+	out := make([]string, 0, len(lines))
+	inFence := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		out = append(out, line)
+	}
+	return []byte(strings.Join(out, "\n"))
+}
+
+func mergeValidatedContentRoutes(base string, routeSet map[string]struct{}, candidates map[string]struct{}, mu *sync.Mutex) {
+	if len(candidates) == 0 {
+		return
+	}
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		return
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	paths := make([]string, 0, len(candidates))
+	for p := range candidates {
+		if _, ok := routeSet[p]; ok {
+			continue
+		}
+		paths = append(paths, p)
+	}
+	if len(paths) == 0 {
+		return
+	}
+	sort.Strings(paths)
+
+	homeCT, homeBody, _, _ := fetchRouteResponse(client, baseURL, "/")
+	homeSig := normalizedResponseSignature(homeCT, homeBody, paths)
+	missingCT, missingBody, _, _ := fetchRouteResponse(client, baseURL, "/__surisc_nonexistent_route_probe__")
+	missingSig := normalizedResponseSignature(missingCT, missingBody, paths)
+
+	for _, p := range paths {
+		ctype, body, statusCode, _ := fetchRouteResponse(client, baseURL, p)
+		if statusCode == 0 || statusCode >= 400 {
+			continue
+		}
+		normSig := normalizedResponseSignature(ctype, body, paths)
+		if isLikelyFallbackResponse(ctype, normSig, homeSig, missingSig) {
+			continue
+		}
+		// If HTML looks like generic SPA shell/fallback, keep it out of routes list.
+		if statusCode == 200 && strings.Contains(strings.ToLower(ctype), "html") {
+			continue
+		}
+		mu.Lock()
+		routeSet[p] = struct{}{}
+		mu.Unlock()
 	}
 }
 
@@ -1328,10 +1398,77 @@ func addRoute(raw string, baseURL *url.URL, routeSet map[string]struct{}, mu *sy
 	if abs.RawQuery != "" {
 		normalized += "?" + abs.RawQuery
 	}
+	if !isLikelyRealRoute(normalized) {
+		return
+	}
 
 	mu.Lock()
 	routeSet[normalized] = struct{}{}
 	mu.Unlock()
+}
+
+func isLikelyWordPressBody(s string) bool {
+	// Require WordPress-specific runtime/resource signals to avoid article text false positives.
+	if strings.Contains(s, "wp-content/") || strings.Contains(s, "wp-includes/") {
+		return true
+	}
+	if strings.Contains(s, "wp-json") || strings.Contains(s, "xmlrpc.php") || strings.Contains(s, "wp-admin") {
+		return true
+	}
+	if strings.Contains(s, `name="generator"`) && strings.Contains(s, "wordpress") {
+		return true
+	}
+	return false
+}
+
+func isLikelyRealRoute(route string) bool {
+	r := strings.TrimSpace(route)
+	if r == "" {
+		return false
+	}
+	rl := strings.ToLower(r)
+
+	// Ignore obvious placeholders/template routes and non-web path snippets.
+	badFragments := []string{
+		":id",
+		"{id}",
+		"<id>",
+		"comment:/",
+		"/etc/",
+		"/var/",
+		"/opt/",
+		"/mnt/",
+		"/tmp/",
+		"/root/",
+		"/home/",
+		"/src/content/",
+		".md",
+		".mdx",
+		".pem",
+		".crt",
+		".key",
+		"id_rsa",
+		"$path",
+		"$path:",
+	}
+	for _, frag := range badFragments {
+		if strings.Contains(rl, frag) {
+			return false
+		}
+	}
+
+	// Filter unusual route tokens not typical for URL paths.
+	if strings.ContainsAny(r, ",\\") {
+		return false
+	}
+	// Certificate subjects and regex-like snippets are not routable paths.
+	if strings.Contains(r, "C=") && strings.Contains(r, "/ST=") {
+		return false
+	}
+	if strings.Contains(r, "=.+") || strings.Contains(r, "/i") {
+		return false
+	}
+	return true
 }
 
 func sortedRoutes(routeSet map[string]struct{}) []string {
