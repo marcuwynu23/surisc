@@ -45,7 +45,10 @@ type TechInsight struct {
 	XFrameOptions         string   `json:"x_frame_options,omitempty"`
 	StrictTransportSecurity string `json:"strict_transport_security,omitempty"`
 	AccessControlAllowOrigin string `json:"access_control_allow_origin,omitempty"`
+	CookieSecurity         []string `json:"cookie_security,omitempty"`
+	JWTIndicators          []string `json:"jwt_indicators,omitempty"`
 	Routes                []string `json:"routes,omitempty"`
+	ProbedRoutes          []string `json:"probed_routes,omitempty"`
 	RobotsTxt             string   `json:"robots_txt,omitempty"`
 	SitemapXML            string   `json:"sitemap_xml,omitempty"`
 }

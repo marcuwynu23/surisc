@@ -93,6 +93,19 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 	var ts *httptest.Server
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/admin":
+			http.SetCookie(w, &http.Cookie{
+				Name:     "auth_token",
+				Value:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature",
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteLaxMode,
+			})
+			w.Header().Set("Content-Type", "text/plain")
+			fmt.Fprint(w, "ok")
+		case "/api", "/auth", "/dashboard", "/graphql", "/__surisc_nonexistent_route_probe__":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, "<html><body>spa fallback</body></html>")
 		case "/robots.txt":
 			w.Header().Set("Content-Security-Policy", "default-src 'self'")
 			w.Header().Set("X-Frame-Options", "DENY")
@@ -166,5 +179,14 @@ func TestRunScanInformativeIncludesRoutes(t *testing.T) {
 	}
 	if insight.AccessControlAllowOrigin == "" {
 		t.Fatalf("expected Access-Control-Allow-Origin to be detected")
+	}
+	if len(insight.CookieSecurity) == 0 {
+		t.Fatalf("expected cookie security findings")
+	}
+	if len(insight.JWTIndicators) == 0 {
+		t.Fatalf("expected jwt indicators")
+	}
+	if len(insight.ProbedRoutes) != 1 || insight.ProbedRoutes[0] != "/admin -> 200" {
+		t.Fatalf("expected only real attack-surface route to remain, got %v", insight.ProbedRoutes)
 	}
 }

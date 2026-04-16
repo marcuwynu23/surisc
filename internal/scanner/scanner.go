@@ -1,6 +1,8 @@
 package scanner
 
 import (
+	"fmt"
+	"hash/fnv"
 	"io"
 	"log"
 	"math"
@@ -44,6 +46,7 @@ var (
 	rxBTCAddress       = regexp.MustCompile(`^(?:[13])[a-km-zA-HJ-NP-Z1-9]{25,34}$`)
 	rxRouteLiteral     = regexp.MustCompile(`["'](\/[A-Za-z0-9._~!$&()*+,;=:@%\-\/]*)["']`)
 	rxAbsoluteURL      = regexp.MustCompile(`https?://[A-Za-z0-9\.\-]+(?:\:[0-9]+)?\/[A-Za-z0-9._~!$&()*+,;=:@%\-\/]*`)
+	rxJWTLike          = regexp.MustCompile(`^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$`)
 )
 
 func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.TechInsight) {
@@ -104,6 +107,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 				if insight.AccessControlAllowOrigin == "" {
 					insight.AccessControlAllowOrigin = resp.Header.Get("Access-Control-Allow-Origin")
 				}
+				mergeCookieInsights(resp.Cookies(), &insight)
 				insightMutex.Unlock()
 			}
 		}
@@ -129,6 +133,24 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 				insight.SitemapXML = body
 				insightMutex.Unlock()
 				extractRoutesFromContent([]byte(body), mustParseURL(targetURL), routeSet, &routesMutex)
+			}
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			probe := probeAttackSurfaceRoutes(targetURL, []string{"/admin", "/api", "/auth", "/dashboard", "/graphql"})
+			insightMutex.Lock()
+			insight.ProbedRoutes = probe.routes
+			for _, c := range probe.cookies {
+				insight.CookieSecurity = append(insight.CookieSecurity, c)
+			}
+			for _, j := range probe.jwtIndicators {
+				insight.JWTIndicators = append(insight.JWTIndicators, j)
+			}
+			insightMutex.Unlock()
+			for _, p := range []string{"/admin", "/api", "/auth", "/dashboard", "/graphql"} {
+				addRoute(p, mustParseURL(targetURL), routeSet, &routesMutex)
 			}
 		}()
 	}
@@ -240,6 +262,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		if insight.AccessControlAllowOrigin == "" {
 			insight.AccessControlAllowOrigin = r.Headers.Get("Access-Control-Allow-Origin")
 		}
+		mergeCookieInsights(cookiesFromHeader(r.Headers), &insight)
 		insightMutex.Unlock()
 
 		ctype := r.Headers.Get("Content-Type")
@@ -278,9 +301,147 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	if insight.SPA == "" {
 		insight.SPA = "No"
 	}
+	sort.Strings(insight.CookieSecurity)
+	sort.Strings(insight.JWTIndicators)
 	insight.Routes = sortedRoutes(routeSet)
 
 	return leaks, insight
+}
+
+func mergeCookieInsights(cookies []*http.Cookie, insight *models.TechInsight) {
+	cookieSet := make(map[string]struct{}, len(insight.CookieSecurity))
+	jwtSet := make(map[string]struct{}, len(insight.JWTIndicators))
+	for _, v := range insight.CookieSecurity {
+		cookieSet[v] = struct{}{}
+	}
+	for _, v := range insight.JWTIndicators {
+		jwtSet[v] = struct{}{}
+	}
+
+	for _, c := range cookies {
+		if c == nil {
+			continue
+		}
+		if c.HttpOnly {
+			cookieSet["HttpOnly cookie: "+c.Name] = struct{}{}
+		}
+		if c.Secure {
+			cookieSet["Secure cookie: "+c.Name] = struct{}{}
+		}
+		if c.SameSite != http.SameSiteDefaultMode {
+			cookieSet["SameSite cookie: "+c.Name] = struct{}{}
+		}
+		nameLower := strings.ToLower(c.Name)
+		if strings.Contains(nameLower, "jwt") || strings.Contains(nameLower, "token") || strings.Contains(nameLower, "auth") {
+			jwtSet["JWT-like cookie name: "+c.Name] = struct{}{}
+		}
+		if rxJWTLike.MatchString(c.Value) {
+			jwtSet["JWT-like cookie value: " + c.Name] = struct{}{}
+		}
+	}
+
+	insight.CookieSecurity = mapKeys(cookieSet)
+	insight.JWTIndicators = mapKeys(jwtSet)
+}
+
+func mapKeys(set map[string]struct{}) []string {
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+type attackSurfaceProbeResult struct {
+	routes        []string
+	cookies       []string
+	jwtIndicators []string
+}
+
+func probeAttackSurfaceRoutes(base string, paths []string) attackSurfaceProbeResult {
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		return attackSurfaceProbeResult{}
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	results := make([]string, 0, len(paths))
+	var insight models.TechInsight
+	fallbackSig := fetchRouteSignature(client, baseURL, "/__surisc_nonexistent_route_probe__")
+
+	for _, p := range paths {
+		ref, err := url.Parse(p)
+		if err != nil {
+			continue
+		}
+		u := baseURL.ResolveReference(ref).String()
+		req, err := http.NewRequest("GET", u, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			results = append(results, fmt.Sprintf("%s -> request error", p))
+			continue
+		}
+		mergeCookieInsights(resp.Cookies(), &insight)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
+		_ = resp.Body.Close()
+
+		if resp.StatusCode < 400 {
+			sig := responseSignature(resp.Header.Get("Content-Type"), body)
+			if fallbackSig != "" && sig == fallbackSig {
+				continue
+			}
+			results = append(results, fmt.Sprintf("%s -> %d", p, resp.StatusCode))
+		}
+	}
+	sort.Strings(results)
+	return attackSurfaceProbeResult{
+		routes:        results,
+		cookies:       insight.CookieSecurity,
+		jwtIndicators: insight.JWTIndicators,
+	}
+}
+
+func fetchRouteSignature(client *http.Client, baseURL *url.URL, path string) string {
+	ref, err := url.Parse(path)
+	if err != nil {
+		return ""
+	}
+	u := baseURL.ResolveReference(ref).String()
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
+	return responseSignature(resp.Header.Get("Content-Type"), body)
+}
+
+func responseSignature(contentType string, body []byte) string {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(strings.ToLower(contentType)))
+	_, _ = h.Write(body)
+	return fmt.Sprintf("%x", h.Sum64())
+}
+
+func cookiesFromHeader(h *http.Header) []*http.Cookie {
+	if h == nil {
+		return nil
+	}
+	resp := &http.Response{Header: *h}
+	return resp.Cookies()
 }
 
 func classifySPAFromHTML(body []byte) string {

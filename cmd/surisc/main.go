@@ -66,10 +66,15 @@ func main() {
 					{"X-Frame-Options", insight.XFrameOptions},
 					{"HSTS", insight.StrictTransportSecurity},
 					{"ACAO", insight.AccessControlAllowOrigin},
+					{"Cookie Security", fmt.Sprintf("%d findings", len(insight.CookieSecurity))},
+					{"JWT Indicators", fmt.Sprintf("%d findings", len(insight.JWTIndicators))},
 				})
 			}
 			if showRoutes && len(insight.Routes) > 0 {
 				printListSection("Routes", insight.Routes)
+			}
+			if showRoutes && len(insight.ProbedRoutes) > 0 {
+				printListSection("Hidden Routes / Attack Surface", insight.ProbedRoutes)
 			}
 			if showRobots && insight.RobotsTxt != "" {
 				printRobotsTable(insight.RobotsTxt)
@@ -79,10 +84,13 @@ func main() {
 			}
 
 			hasOutput := false
-			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "" || insight.ContentSecurityPolicy != "" || insight.XFrameOptions != "" || insight.StrictTransportSecurity != "" || insight.AccessControlAllowOrigin != "") {
+			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "" || insight.ContentSecurityPolicy != "" || insight.XFrameOptions != "" || insight.StrictTransportSecurity != "" || insight.AccessControlAllowOrigin != "" || len(insight.CookieSecurity) > 0 || len(insight.JWTIndicators) > 0) {
 				hasOutput = true
 			}
 			if showRoutes && len(insight.Routes) > 0 {
+				hasOutput = true
+			}
+			if showRoutes && len(insight.ProbedRoutes) > 0 {
 				hasOutput = true
 			}
 			if showRobots && insight.RobotsTxt != "" {
@@ -90,6 +98,12 @@ func main() {
 			}
 			if showSitemaps && insight.SitemapXML != "" {
 				hasOutput = true
+			}
+			if showServerInfo && len(insight.CookieSecurity) > 0 {
+				printListSection("Cookie Security", insight.CookieSecurity)
+			}
+			if showServerInfo && len(insight.JWTIndicators) > 0 {
+				printListSection("JWT Indicators", insight.JWTIndicators)
 			}
 
 			if !hasOutput {
