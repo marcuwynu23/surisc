@@ -212,3 +212,22 @@ func TestRunScanInformativeIgnoresHTMLFallbackForRobotsAndSitemap(t *testing.T) 
 		t.Fatalf("expected sitemap.xml HTML fallback to be ignored")
 	}
 }
+
+func TestRunScanInformativeIgnoresMixedRobotsWithHTML(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/robots.txt":
+			w.Header().Set("Content-Type", "text/plain")
+			fmt.Fprint(w, "User-agent: *\nAllow: /\n\n<!doctype html><html><body>fallback</body></html>")
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<html><body><div id="root"></div></body></html>`)
+		}
+	}))
+	defer ts.Close()
+
+	_, insight := scanner.RunScan(ts.URL, true)
+	if insight.RobotsTxt != "" {
+		t.Fatalf("expected robots.txt mixed HTML content to be ignored")
+	}
+}
