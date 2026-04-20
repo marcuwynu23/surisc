@@ -1,9 +1,10 @@
 <div align="center">
   <h1>surisc</h1>
 
-  ![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)
-  ![Security](https://img.shields.io/badge/Security-Reconnaissance-red?style=flat)
-  ![Status](https://img.shields.io/badge/Status-Active-success?style=flat)
+![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)
+![Security](https://img.shields.io/badge/Security-Reconnaissance-red?style=flat)
+![Status](https://img.shields.io/badge/Status-Active-success?style=flat)
+![Downloads](https://img.shields.io/github/downloads/marcuwynu23/surisc/total)
 
   <p><strong>A high-performance reconnaissance tool built specifically for frontend web security.</strong></p>
 </div>
@@ -17,24 +18,24 @@ Written in Go, it operates entirely in memory to scrape, parse, and analyze Java
 - **Shannon Entropy Analysis**: Scans alphanumeric strings to calculate true information density (`H = - sum(p * log2(p))`), allowing the scanner to flag complex payloads such as JWTs or generic cloud provider keys.
 - **Pattern Matching**: Contains built-in rules designed to detect:
 
-  | Target / Platform | Pattern / Description |
-  | :--- | :--- |
-  | AWS Access Keys | `AKIA...` |
-  | Stripe Secret Keys | `sk_live_...` |
-  | GitHub Personal Access Tokens | `ghp_...` |
-  | GitLab Personal Access Tokens | `glpat-...` |
-  | Mail Service API Keys | SendGrid, Mailgun, Resend |
-  | Payment & Gateway Tokens | Square, Twilio |
-  | Cloudflare Credentials | Global API keys and API tokens |
-  | User API Tokens | `user_api_token` / `user-api-token` style assignments |
-  | RSA Private Keys headers | `-----BEGIN PRIVATE KEY...` |
-  | Slack API Tokens | `xoxb-...` |
-  | Google API Keys | Generic GCP, Maps, Firebase (`AIza...`) |
-  | Exposed map file dependencies | `.map` |
-  | `Bearer` authentication tokens | `Bearer ...` |
-  | Internal IP address ranges | `10.x`, `172.16.x`, `192.168.x` |
-  | Build-time `import.meta` asset leaks | `import.meta.env.*` |
-  | Generic secret strings | Variable assignments (e.g., `API_KEY:"value"`) |
+  | Target / Platform                    | Pattern / Description                                 |
+  | :----------------------------------- | :---------------------------------------------------- |
+  | AWS Access Keys                      | `AKIA...`                                             |
+  | Stripe Secret Keys                   | `sk_live_...`                                         |
+  | GitHub Personal Access Tokens        | `ghp_...`                                             |
+  | GitLab Personal Access Tokens        | `glpat-...`                                           |
+  | Mail Service API Keys                | SendGrid, Mailgun, Resend                             |
+  | Payment & Gateway Tokens             | Square, Twilio                                        |
+  | Cloudflare Credentials               | Global API keys and API tokens                        |
+  | User API Tokens                      | `user_api_token` / `user-api-token` style assignments |
+  | RSA Private Keys headers             | `-----BEGIN PRIVATE KEY...`                           |
+  | Slack API Tokens                     | `xoxb-...`                                            |
+  | Google API Keys                      | Generic GCP, Maps, Firebase (`AIza...`)               |
+  | Exposed map file dependencies        | `.map`                                                |
+  | `Bearer` authentication tokens       | `Bearer ...`                                          |
+  | Internal IP address ranges           | `10.x`, `172.16.x`, `192.168.x`                       |
+  | Build-time `import.meta` asset leaks | `import.meta.env.*`                                   |
+  | Generic secret strings               | Variable assignments (e.g., `API_KEY:"value"`)        |
 
 - **False Positive Filtering**: Automatically ignores standard frontend compilation artifacts such as the Base64 sequence dictionary, WebAssembly module headers, and standard React.js validation warnings.
 - **Informative Security Posture Checks (`-i`)**:
@@ -76,14 +77,17 @@ make test
 SuriSC can be executed directly from the terminal and supports both raw console output and JSON rendering.
 
 ### Basic Reconnaissance Scan
+
 ```sh
 .\dist\surisc.exe -u https://example.com
 ```
 
 ### Informative Target Analysis (Technology + Security Profiling)
+
 The `-i` flag skips secret-leak scanning and focuses on target profiling.
 
 Supported scopes:
+
 - `-i` or `-i all`: all informative sections
 - `-i serverinfo`: infra/security table only
 - `-i routes`: discovered routes + hidden route probe results
@@ -99,11 +103,13 @@ Supported scopes:
 ```
 
 ### JSON Reporting Mode
+
 ```sh
 .\dist\surisc.exe -u https://example.com -o json
 ```
 
 ### Output Example
+
 ```text
 SuriSC Completed. Results:
 --------------------------------------------------------------------------------
@@ -126,11 +132,13 @@ SuriSC can be built and run in a container environment using either Docker or Po
 ### Building the Image
 
 Using **Docker**:
+
 ```sh
 docker build -t surisc .
 ```
 
 Using **Podman**:
+
 ```sh
 podman build -t surisc .
 ```
@@ -140,19 +148,25 @@ podman build -t surisc .
 Once built, you can run the container by passing your target URL using the `-u` flag.
 
 Using **Docker**:
+
 ```sh
 docker run --rm surisc -u https://example.com
 ```
+
 For JSON output:
+
 ```sh
 docker run --rm surisc -u https://example.com -o json
 ```
 
 Using **Podman**:
+
 ```sh
 podman run --rm surisc -u https://example.com
 ```
+
 For JSON output:
+
 ```sh
 podman run --rm surisc -u https://example.com -o json
 ```
@@ -162,11 +176,13 @@ podman run --rm surisc -u https://example.com -o json
 You can also run SuriSC directly from the GitHub Container Registry without needing to build it locally.
 
 **Run using Docker**:
+
 ```sh
 docker run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com
 ```
 
 **Run using Podman**:
+
 ```sh
 podman run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com
 ```
