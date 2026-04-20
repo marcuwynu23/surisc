@@ -1,9 +1,9 @@
 <div align="center">
   <h1>surisc</h1>
 
-![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)
-![Security](https://img.shields.io/badge/Security-Reconnaissance-red?style=flat)
-![Status](https://img.shields.io/badge/Status-Active-success?style=flat)
+![GitHub release](https://img.shields.io/github/v/release/marcuwynu23/surisc)
+![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen)
+![Build Status](https://github.com/marcuwynu23/surisc/actions/workflows/release.yml/badge.svg)
 ![Downloads](https://img.shields.io/github/downloads/marcuwynu23/surisc/total)
 
   <p><strong>A high-performance reconnaissance tool built specifically for frontend web security.</strong></p>
