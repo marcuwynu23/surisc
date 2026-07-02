@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="SuriSC usage guide - basic scanning, security profiling, JSON output.">
+<title>Usage · SuriSC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="header-bar">
+  <div class="container">
+    <div class="logo-wrap">
+      <a href="/" class="logo">Suri<span class="sc">SC</span></a>
+      <span class="subtitle">Find what your frontend hides.</span>
+    </div>
+    <nav>
+      <a href="about.html">About</a>
+      <a href="features.html">Features</a>
+      <a href="installation.html">Install</a>
+      <a href="usage.html">Usage</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Usage</h1>
+      <p>Running scans and interpreting results.</p>
+    </div>
+
+    <section>
+      <h2>Basic scan</h2>
+      <p>Perform a full reconnaissance scan against a target URL.</p>
+      <pre><code><span class="comment"># Basic reconnaissance scan</span>
+<span class="cmd">surisc -u https://example.com</span>
+
+<span class="comment"># JSON output for programmatic consumption</span>
+<span class="cmd">surisc -u https://example.com -o json</span></code></pre>
+    </section>
+
+    <section>
+      <h2>Security profiling</h2>
+      <p>The <code>-i</code> flag skips secret scanning and focuses on target profiling. Supported scopes:</p>
+      <ul class="desc-list">
+        <li><strong>-i</strong> or <strong>-i all</strong> All informative sections</li>
+        <li><strong>-i serverinfo</strong> Infrastructure and security headers</li>
+        <li><strong>-i routes</strong> Discovered routes and hidden path probe results</li>
+        <li><strong>-i robots</strong> robots.txt audit</li>
+        <li><strong>-i sitemaps</strong> sitemap.xml audit</li>
+      </ul>
+      <pre><code><span class="cmd">surisc -u https://example.com -i</span>
+<span class="cmd">surisc -u https://example.com -i serverinfo</span>
+<span class="cmd">surisc -u https://example.com -i routes</span>
+<span class="cmd">surisc -u https://example.com -i robots</span>
+<span class="cmd">surisc -u https://example.com -i sitemaps</span></code></pre>
+    </section>
+
+    <section>
+      <h2>Example output</h2>
+<pre><code><span class="dim">SuriSC Completed. Results:</span>
+<span class="dim">--------------------------------------------------------------------------------</span>
+[!]     [GOOGLE_API_KEY]
+        [SOURCE_URL]: https://example.com/assets/index.js
+        [GRAVITY_SCORE]: 9.00
+        [SNIPPET]: AIzaSyBLT...</code></pre>
+    </section>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="/" class="logo">Suri<span class="sc">SC</span></a>
+        <p>A high-performance reconnaissance tool for frontend web security. Written in Go.</p>
+      </div>
+      <div>
+        <h4>Docs</h4>
+        <ul>
+          <li><a href="about.html">About</a></li>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="installation.html">Install</a></li>
+          <li><a href="usage.html">Usage</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="https://github.com/marcuwynu23/surisc" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/releases" target="_blank" rel="noopener">Releases</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/issues" target="_blank" rel="noopener">Issues</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/LICENSE" target="_blank" rel="noopener">License</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of Conduct</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 <a href="https://github.com/marcuwynu23" target="_blank" rel="noopener">marcuwynu23</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
