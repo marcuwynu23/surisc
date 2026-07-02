@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="SuriSC features - pattern matching, entropy analysis, security profiling.">
+<title>Features · SuriSC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="header-bar">
+  <div class="container">
+    <div class="logo-wrap">
+      <a href="/" class="logo">Suri<span class="sc">SC</span></a>
+      <span class="subtitle">Find what your frontend hides.</span>
+    </div>
+    <nav>
+      <a href="about.html">About</a>
+      <a href="features.html">Features</a>
+      <a href="installation.html">Install</a>
+      <a href="usage.html">Usage</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Features</h1>
+      <p>What SuriSC detects and how it analyzes targets.</p>
+    </div>
+
+    <section>
+      <h2>Secret detection</h2>
+      <div class="feature-list">
+        <div class="item"><strong>AWS Access Keys</strong><span>AKIA-prefixed keys</span></div>
+        <div class="item"><strong>Stripe Secret Keys</strong><span>sk_live_ prefixed keys</span></div>
+        <div class="item"><strong>GitHub Tokens</strong><span>ghp_ personal access tokens</span></div>
+        <div class="item"><strong>GitLab Tokens</strong><span>glpat- prefixed tokens</span></div>
+        <div class="item"><strong>Google API Keys</strong><span>AIza-prefixed keys (GCP, Maps, Firebase)</span></div>
+        <div class="item"><strong>Slack Tokens</strong><span>xoxb- bot tokens</span></div>
+        <div class="item"><strong>Cloudflare Credentials</strong><span>Global API keys and tokens</span></div>
+        <div class="item"><strong>Mail Service Keys</strong><span>SendGrid, Mailgun, Resend</span></div>
+        <div class="item"><strong>Payment Tokens</strong><span>Square, Twilio</span></div>
+        <div class="item"><strong>RSA Private Keys</strong><span>-----BEGIN PRIVATE KEY----- headers</span></div>
+        <div class="item"><strong>Bearer Tokens</strong><span>Authorization bearer tokens</span></div>
+        <div class="item"><strong>Internal IPs</strong><span>10.x, 172.16.x, 192.168.x ranges</span></div>
+        <div class="item"><strong>Env Leaks</strong><span>import.meta.env.* build-time leaks</span></div>
+        <div class="item"><strong>Generic Secrets</strong><span>Variable assignments like API_KEY:"value"</span></div>
+        <div class="item"><strong>Map Files</strong><span>Exposed .map dependency files</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Security profiling (-i flag)</h2>
+      <div class="feature-list">
+        <div class="item"><strong>SPA Detection</strong><span>Identifies single-page application frameworks</span></div>
+        <div class="item"><strong>Security Headers</strong><span>CSP, X-Frame-Options, HSTS, CORS checks</span></div>
+        <div class="item"><strong>Cookie Hardening</strong><span>HttpOnly, Secure, SameSite flags</span></div>
+        <div class="item"><strong>JWT Detection</strong><span>Indicators from cookie names and values</span></div>
+        <div class="item"><strong>Route Discovery</strong><span>Extracts routes from HTML, JS, JSON, robots.txt, sitemap.xml</span></div>
+        <div class="item"><strong>Attack-surface Probing</strong><span>Common paths: /admin, /api, /auth, /dashboard, /graphql</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Engine</h2>
+      <div class="feature-list">
+        <div class="item"><strong>Memory-Resident</strong><span>Operates entirely in RAM. No temp files written to disk.</span></div>
+        <div class="item"><strong>Concurrent</strong><span>Goroutine-based engine processes multiple bundles in parallel.</span></div>
+        <div class="item"><strong>Entropy Analysis</strong><span>Shannon entropy scoring to flag high-randomness strings.</span></div>
+        <div class="item"><strong>False Positive Filtering</strong><span>Ignores Base64 dicts, WASM headers, React warnings.</span></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="/" class="logo">Suri<span class="sc">SC</span></a>
+        <p>A high-performance reconnaissance tool for frontend web security. Written in Go.</p>
+      </div>
+      <div>
+        <h4>Docs</h4>
+        <ul>
+          <li><a href="about.html">About</a></li>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="installation.html">Install</a></li>
+          <li><a href="usage.html">Usage</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="https://github.com/marcuwynu23/surisc" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/releases" target="_blank" rel="noopener">Releases</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/issues" target="_blank" rel="noopener">Issues</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/LICENSE" target="_blank" rel="noopener">License</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of Conduct</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 <a href="https://github.com/marcuwynu23" target="_blank" rel="noopener">marcuwynu23</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
