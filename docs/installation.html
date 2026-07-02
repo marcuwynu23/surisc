@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Install SuriSC - build from source, Docker, Podman, or GitHub Container Registry.">
+<title>Install · SuriSC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="header-bar">
+  <div class="container">
+    <div class="logo-wrap">
+      <a href="/" class="logo">Suri<span class="sc">SC</span></a>
+      <span class="subtitle">Find what your frontend hides.</span>
+    </div>
+    <nav>
+      <a href="about.html">About</a>
+      <a href="features.html">Features</a>
+      <a href="installation.html">Install</a>
+      <a href="usage.html">Usage</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Install</h1>
+      <p>Build from source or run via container.</p>
+    </div>
+
+    <section>
+      <h2>Source</h2>
+      <p>Compile using the included Makefile. Requires Go 1.21+.</p>
+      <pre><code><span class="cmd">make all</span>      <span class="comment"># compile into dist/surisc.exe</span>
+<span class="cmd">make clean</span>    <span class="comment"># clean build outputs</span>
+<span class="cmd">make test</span>     <span class="comment"># run unit and E2E tests</span></code></pre>
+    </section>
+
+    <section>
+      <h2>Docker</h2>
+      <pre><code><span class="cmd">docker build -t surisc .</span>
+<span class="cmd">docker run --rm surisc -u https://example.com</span></code></pre>
+    </section>
+
+    <section>
+      <h2>Podman</h2>
+      <pre><code><span class="cmd">podman build -t surisc .</span>
+<span class="cmd">podman run --rm surisc -u https://example.com</span></code></pre>
+    </section>
+
+    <section>
+      <h2>GitHub Container Registry</h2>
+      <p>Run directly without building locally.</p>
+      <pre><code><span class="cmd">docker run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com</span></code></pre>
+      <pre><code><span class="cmd">podman run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com</span></code></pre>
+    </section>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="/" class="logo">Suri<span class="sc">SC</span></a>
+        <p>A high-performance reconnaissance tool for frontend web security. Written in Go.</p>
+      </div>
+      <div>
+        <h4>Docs</h4>
+        <ul>
+          <li><a href="about.html">About</a></li>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="installation.html">Install</a></li>
+          <li><a href="usage.html">Usage</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="https://github.com/marcuwynu23/surisc" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/releases" target="_blank" rel="noopener">Releases</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/issues" target="_blank" rel="noopener">Issues</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/LICENSE" target="_blank" rel="noopener">License</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a></li>
+          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of Conduct</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 <a href="https://github.com/marcuwynu23" target="_blank" rel="noopener">marcuwynu23</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
