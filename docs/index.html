@@ -20,18 +20,20 @@
     <nav>
       <a href="about.html">About</a>
       <a href="features.html">Features</a>
-      <a href="installation.html">Install</a>
+      <a href="installation.html">Installation</a>
       <a href="usage.html">Usage</a>
     </nav>
   </div>
 </div>
 
-<section class="hero">
-  <div class="container">
+<section class="hero" id="hero">
+  <canvas id="bg-canvas"></canvas>
+  <div class="container" style="position:relative; z-index:1;">
     <h1>Suri<span class="sc">SC</span></h1>
     <p>A high-performance reconnaissance tool for frontend web security.</p>
     <div class="hero-actions">
       <a href="installation.html" class="btn btn-primary">Get started</a>
+      <a href="https://github.com/marcuwynu23/surisc/releases" class="btn btn-secondary" target="_blank" rel="noopener">Download</a>
       <a href="https://github.com/marcuwynu23/surisc" class="btn btn-secondary" target="_blank" rel="noopener">GitHub</a>
     </div>
   </div>
@@ -49,7 +51,7 @@
         <ul>
           <li><a href="about.html">About</a></li>
           <li><a href="features.html">Features</a></li>
-          <li><a href="installation.html">Install</a></li>
+          <li><a href="installation.html">Installation</a></li>
           <li><a href="usage.html">Usage</a></li>
         </ul>
       </div>
@@ -75,5 +77,73 @@
     </div>
   </div>
 </footer>
+<script>
+(function(){
+  var canvas = document.getElementById('bg-canvas');
+  var hero = document.getElementById('hero');
+  var ctx = canvas.getContext('2d');
+  var W, H;
+  function resize(){
+    var rect = hero.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    W = canvas.width;
+    H = canvas.height;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  var hexagons = [];
+  var COUNT = 40;
+  for(var i=0;i<COUNT;i++){
+    hexagons.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: 10 + Math.random() * 30,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: -0.2 - Math.random() * 0.4,
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 0.01,
+      alpha: 0.1 + Math.random() * 0.3
+    });
+  }
+
+  function drawHex(cx, cy, r, rot){
+    ctx.beginPath();
+    for(var i=0;i<6;i++){
+      var angle = rot + i * Math.PI / 3;
+      var x = cx + r * Math.cos(angle);
+      var y = cy + r * Math.sin(angle);
+      if(i===0) ctx.moveTo(x,y);
+      else ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  function animate(){
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1;
+    for(var i=0;i<hexagons.length;i++){
+      var h = hexagons[i];
+      h.x += h.vx;
+      h.y += h.vy;
+      h.rot += h.vr;
+      if(h.y + h.r < 0){
+        h.y = H + h.r;
+        h.x = Math.random() * W;
+      }
+      if(h.x + h.r < 0) h.x = W + h.r;
+      if(h.x - h.r > W) h.x = -h.r;
+      ctx.globalAlpha = h.alpha;
+      drawHex(h.x, h.y, h.r, h.rot);
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+</script>
 </body>
 </html>
