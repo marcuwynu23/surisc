@@ -23,7 +23,17 @@
       <a href="installation.html">Installation</a>
       <a href="usage.html">Usage</a>
     </nav>
+    <button class="hamburger" id="hamburger" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
   </div>
+</div>
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="drawer">
+  <a href="about.html">About</a>
+  <a href="features.html">Features</a>
+  <a href="installation.html">Installation</a>
+  <a href="usage.html">Usage</a>
 </div>
 
 <section class="hero" id="hero">
@@ -78,6 +88,15 @@
   </div>
 </footer>
 <script>
+(function(){
+  var hamburger = document.getElementById('hamburger');
+  var drawer = document.getElementById('drawer');
+  var overlay = document.getElementById('drawerOverlay');
+  function openDrawer(){ drawer.classList.add('open'); overlay.classList.add('open'); overlay.style.display = 'block'; }
+  function closeDrawer(){ drawer.classList.remove('open'); overlay.classList.remove('open'); setTimeout(function(){ overlay.style.display = 'none'; }, 250); }
+  if(hamburger){ hamburger.addEventListener('click', openDrawer); }
+  if(overlay){ overlay.addEventListener('click', closeDrawer); }
+})();
 (function(){
   var canvas = document.getElementById('bg-canvas');
   var hero = document.getElementById('hero');
