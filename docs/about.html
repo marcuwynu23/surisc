@@ -23,7 +23,17 @@
       <a href="installation.html">Installation</a>
       <a href="usage.html">Usage</a>
     </nav>
+    <button class="hamburger" id="hamburger" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
   </div>
+</div>
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="drawer">
+  <a href="about.html">About</a>
+  <a href="features.html">Features</a>
+  <a href="installation.html">Installation</a>
+  <a href="usage.html">Usage</a>
 </div>
 
 <div class="page">
@@ -108,5 +118,16 @@
     </div>
   </div>
 </footer>
+<script>
+(function(){
+  var h = document.getElementById('hamburger');
+  var d = document.getElementById('drawer');
+  var o = document.getElementById('drawerOverlay');
+  function open(){ d.classList.add('open'); o.classList.add('open'); o.style.display = 'block'; }
+  function close(){ d.classList.remove('open'); o.classList.remove('open'); setTimeout(function(){ o.style.display = 'none'; }, 250); }
+  if(h) h.addEventListener('click', open);
+  if(o) o.addEventListener('click', close);
+})();
+</script>
 </body>
 </html>
