@@ -1,5 +1,6 @@
 <div align="center">
-  <h1>surisc</h1>
+
+<img title="" src="./logo/logo-with-title.svg" alt="" width="208">
 
 ![GitHub release](https://img.shields.io/github/v/release/marcuwynu23/surisc)
 ![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen)
