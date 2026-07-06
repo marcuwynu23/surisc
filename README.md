@@ -321,4 +321,6 @@ surisc/
 
 [Apache 2.0](LICENSE) — Copyright (c) 2026 Mark Wayne Menorca
 
+A permissive license that grants you the freedom to use, modify, distribute, and sell the software, provided you include the original copyright notice. It also includes an express grant of patent rights from contributors.
+
 Happy Coding! 🚀
