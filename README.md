@@ -1,115 +1,223 @@
 <div align="center">
 
-<img title="" src="./logo/logo-with-title.svg" alt="" width="208">
+<img src="./logo/logo-with-title.svg" width="208">
 
 ![GitHub release](https://img.shields.io/github/v/release/marcuwynu23/surisc)
-![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen)
+![Go version](https://img.shields.io/github/go-mod/go-version/marcuwynu23/surisc)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue?logo=apache)
 ![Build Status](https://github.com/marcuwynu23/surisc/actions/workflows/release.yml/badge.svg)
 ![Downloads](https://img.shields.io/github/downloads/marcuwynu23/surisc/total)
 
-  <p><strong>A high-performance reconnaissance tool built specifically for frontend web security.</strong></p>
+<strong>Frontend security reconnaissance from the browser's perspective.</strong>
+Proactively hunts leaked API keys, hardcoded credentials, and exposed environment variables in JavaScript bundles.
+
+[Read the full user guide →](USER-GUIDE.md)
+
 </div>
 
-Written in Go, it operates entirely in memory to scrape, parse, and analyze JavaScript bundles from target URLs, proactively hunting for leaked API keys, hardcoded credentials, and exposed environment variables.
+## Table of Contents
 
-## Features
+- [What Is SuriSC?](#what-is-surisc)
+- [Use Cases](#use-cases)
+- [Benefits](#benefits-for-developers)
+- [Advantages Over Other Tools](#advantages-over-other-tools)
+- [User Guide](USER-GUIDE.md)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [CLI Reference](#cli-commands)
+- [Configuration](#configuration)
+- [CI/CD Integration](#cicd-integration)
+- [Development](#development)
+- [Architecture](#architecture)
 
-- **Memory-Resident Scraping**: Operates entirely in RAM using `colly/v2` to intercept target URLs, discover `<script>` tags, and fetch payload contents without writing temporary files to disk.
-- **Concurrent Engine**: Utilizes goroutines and `sync.WaitGroup` to process multiple Javascript bundles concurrently.
-- **Shannon Entropy Analysis**: Scans alphanumeric strings to calculate true information density (`H = - sum(p * log2(p))`), allowing the scanner to flag complex payloads such as JWTs or generic cloud provider keys.
-- **Pattern Matching**: Contains built-in rules designed to detect:
+## What Is SuriSC?
 
-  | Target / Platform                    | Pattern / Description                                 |
-  | :----------------------------------- | :---------------------------------------------------- |
-  | AWS Access Keys                      | `AKIA...`                                             |
-  | Stripe Secret Keys                   | `sk_live_...`                                         |
-  | GitHub Personal Access Tokens        | `ghp_...`                                             |
-  | GitLab Personal Access Tokens        | `glpat-...`                                           |
-  | Mail Service API Keys                | SendGrid, Mailgun, Resend                             |
-  | Payment & Gateway Tokens             | Square, Twilio                                        |
-  | Cloudflare Credentials               | Global API keys and API tokens                        |
-  | User API Tokens                      | `user_api_token` / `user-api-token` style assignments |
-  | RSA Private Keys headers             | `-----BEGIN PRIVATE KEY...`                           |
-  | Slack API Tokens                     | `xoxb-...`                                            |
-  | Google API Keys                      | Generic GCP, Maps, Firebase (`AIza...`)               |
-  | Exposed map file dependencies        | `.map`                                                |
-  | `Bearer` authentication tokens       | `Bearer ...`                                          |
-  | Internal IP address ranges           | `10.x`, `172.16.x`, `192.168.x`                       |
-  | Build-time `import.meta` asset leaks | `import.meta.env.*`                                   |
-  | Generic secret strings               | Variable assignments (e.g., `API_KEY:"value"`)        |
+**SuriSC** (`/səˈrisk/`, _suh-REESK_) is a memory-resident reconnaissance tool built specifically for frontend web security. Written in Go, it scrapes, parses, and analyzes JavaScript bundles from target URLs to detect secrets that should never reach the browser.
 
-- **False Positive Filtering**: Automatically ignores standard frontend compilation artifacts such as the Base64 sequence dictionary, WebAssembly module headers, and standard React.js validation warnings.
-- **Informative Security Posture Checks (`-i`)**:
-  - SPA detection (`Yes` or `No`).
-  - Security headers: `Content-Security-Policy`, `X-Frame-Options`, `Strict-Transport-Security`, `Access-Control-Allow-Origin`.
-  - Cookie hardening signals: `HttpOnly`, `Secure`, `SameSite`.
-  - JWT indicators from cookie names/values.
-  - Route discovery from HTML, JS, JSON, `robots.txt`, and `sitemap.xml`.
-  - Attack-surface probing for common paths (`/admin`, `/api`, `/auth`, `/dashboard`, `/graphql`) with SPA fallback filtering to reduce false positives.
-  - `robots.txt` / `sitemap.xml` validation (HTML fallback is ignored).
+The name combines **suri** (Tagalog: "examine" or "analyze") with **SC** for **scan** — a tool that examines frontends by scanning their JavaScript.
 
-## Terminology
+### What It Does
 
-When looking at your scan results, here is what each term means:
+- **Scrapes** — Discovers every `<script>` tag on a page and fetches its payload without writing files to disk
+- **Detects** — 20+ secret types including AWS keys, Stripe secrets, GitHub PATs, Google API keys, and more
+- **Analyzes** — Shannon entropy scoring flags high-density strings that look like real credentials
+- **Profiles** — Identifies technology stack, hosting provider, CDN, CMS, SPA/PWA status, and security headers
+- **Discovers** — Routes from HTML, JS, JSON, `robots.txt`, and `sitemap.xml`; probes attack-surface paths
+- **Filters** — Built-in false positive suppression ignores compilation artifacts, placeholder values, and standard library internals
+- **Reports** — Human-readable HUD output and machine-readable JSON with gravity scores for triage
 
-- **Gravity Score**: A number (usually 0 to 10) that tells you how certain we are that we found a real secret. A score of 10 means it is highly likely a real API key (like an AWS key). A lower score means it might just be a normal variable or false positive.
-- **Shannon Entropy**: A mathematical way of measuring how "random" a piece of text looks. Real API keys look like random gibberish (high entropy). Regular words like `"password"` don't look random (low entropy). This helps the scanner ignore normal text.
-- **Target / Leak Type**: What kind of secret was found. For example, `GOOGLE_API_KEY` or `STRIPE_SECRET_KEY`.
-- **Source URL**: The exact web address link where the leaked secret is located.
-- **Snippet**: A small preview of the exact code or key that leaked. This saves you from having to read through massive, messy code files yourself.
+### Why Use It?
 
-## Build Instructions
+| Problem                                         | How SuriSC Solves It                                                               |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Accidental API key commits to public JS bundles | Scans every fetched script for 20+ credential patterns with gravity scoring        |
+| `import.meta.env` leaks in Vite/CRA builds      | Detects `VITE_API_URL`, `SUPER_SECRET_TOKEN`, etc.                                 |
+| Source map exposure                             | Flags `.map` references that can reveal full server-side source                    |
+| Unknown tech stack during recon                 | Fingerprints frontend framework, hosting, CDN, CMS, and security headers           |
+| Manual route enumeration takes too long         | Extracts routes from HTML, JS, JSON, `robots.txt`, and `sitemap.xml` automatically |
+| SPA fallback pages hide real endpoints          | Validates probed routes against 404 signatures to filter SPA shell responses       |
 
-Use the included `Makefile` to securely compile SuriSC.
+### The Philosophy
 
-```sh
-# Compile the executable into /dist/surisc.exe
+1. **Minimal setup, maximum value.** A single `-u` flag and you get actionable results. No config file required.
+2. **Your process stays yours.** Works as a standalone CLI, in Docker/Podman containers, or as a CI pipeline step.
+3. **Truth over noise.** Gravity scores, entropy thresholds, and false-positive filters mean every finding deserves your attention.
+
+## Use Cases
+
+| Scenario                     | How SuriSC Helps                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Bug bounty recon**         | Point at a target URL and get a complete security posture report — leaked secrets, tech stack, hidden routes, and missing security headers |
+| **Pre-deployment audit**     | Run in CI/CD against your staging server to catch secrets before they go live                                                              |
+| **Third-party JS audit**     | Scan vendor scripts for hardcoded tokens that could compromise your application                                                            |
+| **Vulnerability assessment** | Identify SPA/PWA technology for targeted exploit research; discover GraphQL endpoints                                                      |
+| **Containerized scanning**   | Run from Docker or Podman for ephemeral, disposable scans without local installation                                                       |
+
+## Benefits for Developers
+
+- **Zero disk writes** — Operates entirely in RAM; leaves no forensic trace on the scanning machine
+- **Concurrent by default** — Goroutine-powered engine processes multiple bundles simultaneously with rate limiting to avoid triggering WAFs
+- **Browser-level evasion** — Chrome-like headers, random user agents, and configurable delays mimic real user traffic
+- **False positive engineered** — Filters Base64 dictionaries, WASM headers, React validation warnings, route-like values, and placeholder strings
+- **Gravity scoring** — Every finding gets a 0–10 score based on pattern confidence and Shannon entropy, so you prioritize what matters
+- **Hosting-aware profiling** — Detects Vercel, Netlify, Cloudflare (Pages, Workers, Proxied), Heroku, Railway, GitHub Pages, and 12+ other providers
+- **Multi-format output** — Human-friendly HUD and `-o json` for pipeline ingestion
+- **Cross-platform** — Ships as Windows binary, NSIS installer, Debian package, macOS (Intel + Apple Silicon), and Docker image
+- **Fast reachability check** — Validates target is live before scanning, with intelligent retry handling
+
+## Advantages Over Other Tools
+
+| Aspect                           | SuriSC                              | SecretScanner | TruffleHog   | WPScan        | manual         |
+| -------------------------------- | ----------------------------------- | ------------- | ------------ | ------------- | -------------- |
+| **Setup time**                   | ~10 seconds                         | Minutes       | Minutes      | Minutes       | Ongoing effort |
+| **Memory-resident**              | Yes                                 | No            | No           | No            | N/A            |
+| **Frontend framework detection** | Yes (10+ frameworks)                | No            | No           | No            | Manual         |
+| **Hosting provider detection**   | Yes (15+ providers)                 | No            | No           | No            | Manual         |
+| **Security header audit**        | Yes                                 | No            | No           | Yes           | Manual         |
+| **SPA/PWA identification**       | Yes                                 | No            | No           | No            | Manual         |
+| **Route discovery**              | Yes                                 | No            | No           | Yes           | Manual         |
+| **Attack-surface probing**       | Yes                                 | No            | No           | Limited       | Manual         |
+| **False-positive filters**       | Built-in per pattern                | Basic         | Basic        | Pattern-based | N/A            |
+| **Gravity scoring**              | Yes                                 | No            | No           | No            | N/A            |
+| **Shannon entropy analysis**     | Yes                                 | Yes           | Yes          | No            | N/A            |
+| **JS bundle scraping**           | Yes                                 | No            | No           | No            | Manual         |
+| **JSON output**                  | Yes                                 | Yes           | Yes          | No            | N/A            |
+| **Docker/Podman support**        | Yes                                 | Yes           | Yes          | Yes           | N/A            |
+| **Multi-platform binary**        | Windows, macOS, Linux (amd64+arm64) | Linux         | Linux, macOS | Linux         | N/A            |
+| **NSIS installer**               | Yes                                 | No            | No           | No            | N/A            |
+| **Debian package**               | Yes                                 | No            | No           | Yes (via apt) | N/A            |
+| **License**                      | Apache 2.0                                 | Custom        | Apache 2.0   | GPL           | N/A            |
+
+## Installation
+
+### From Binary (Windows, macOS, Linux)
+
+Download the latest release from [GitHub Releases](https://github.com/marcuwynu23/surisc/releases).
+
+### From Source (Go)
+
+```bash
+go install github.com/marcuwynu23/surisc/cmd/surisc@latest
+```
+
+### Build from Repository
+
+```bash
+git clone https://github.com/marcuwynu23/surisc.git
+cd surisc
 make all
-
-# Clean previous build outputs
-make clean
-
-# Run Unit and E2E verification tests
-make test
 ```
 
-## Usage
+The binary will be placed in `dist/surisc.exe` (Windows) or `dist/surisc` (Linux/macOS).
 
-SuriSC can be executed directly from the terminal and supports both raw console output and JSON rendering.
+### Docker / Podman
 
-### Basic Reconnaissance Scan
-
-```sh
-.\dist\surisc.exe -u https://example.com
+```bash
+docker pull ghcr.io/marcuwynu23/surisc:latest
+podman pull ghcr.io/marcuwynu23/surisc:latest
 ```
 
-### Informative Target Analysis (Technology + Security Profiling)
+### Verify
 
-The `-i` flag skips secret-leak scanning and focuses on target profiling.
-
-Supported scopes:
-
-- `-i` or `-i all`: all informative sections
-- `-i serverinfo`: infra/security table only
-- `-i routes`: discovered routes + hidden route probe results
-- `-i robots`: `robots.txt` table only
-- `-i sitemaps`: `sitemap.xml` table only
-
-```sh
-.\dist\surisc.exe -u https://example.com -i
-.\dist\surisc.exe -u https://example.com -i serverinfo
-.\dist\surisc.exe -u https://example.com -i routes
-.\dist\surisc.exe -u https://example.com -i robots
-.\dist\surisc.exe -u https://example.com -i sitemaps
+```bash
+surisc --help
+# or
+./dist/surisc.exe --help
 ```
 
-### JSON Reporting Mode
+## Quick Start
 
-```sh
-.\dist\surisc.exe -u https://example.com -o json
+```bash
+# Basic recon scan for secrets
+surisc -u https://example.com
+
+# Full target profiling (tech stack, routes, security headers)
+surisc -u https://example.com -i
+
+# JSON output for pipeline ingestion
+surisc -u https://example.com -o json
 ```
 
-### Output Example
+## CLI Commands
+
+### `-u` (Target URL)
+
+```bash
+surisc --help
+```
+
+| Flag          | Default | Description                                                    |
+| ------------- | ------- | -------------------------------------------------------------- |
+| `-u`          | `""`    | **Required.** Target URL to scan                               |
+| `-o`          | `hud`   | Output format: `hud` (human-readable) or `json`                |
+| `-i`          | `false` | Enable informative target analysis (disables secret leak scan) |
+| `-i=webinfo`  | —       | Show only infrastructure/security header table                 |
+| `-i=routes`   | —       | Show only discovered routes                                    |
+| `-i=robots`   | —       | Show only `robots.txt` analysis                                |
+| `-i=sitemaps` | —       | Show only `sitemap.xml` analysis                               |
+
+### Examples
+
+**Basic secret scan:**
+
+```bash
+surisc -u https://example.com
+```
+
+**Full informative profile:**
+
+```bash
+surisc -u https://example.com -i
+```
+
+**JSON output with secrets:**
+
+```bash
+surisc -u https://example.com -o json
+```
+
+**Technology stack only:**
+
+```bash
+surisc -u https://example.com -i webinfo
+```
+
+**Route discovery only:**
+
+```bash
+surisc -u https://example.com -i routes
+```
+
+## Configuration
+
+SuriSC requires no configuration file. All options are passed as CLI flags.
+
+| Source            | Precedence |
+| ----------------- | ---------- |
+| CLI flags         | Highest    |
+| Built-in defaults | Lowest     |
+
+## Example Output
 
 ```text
 SuriSC Completed. Results:
@@ -123,67 +231,94 @@ SuriSC Completed. Results:
         [SOURCE_URL]: https://example.com/assets/index.js
         [GRAVITY_SCORE]: 8.50
         [SNIPPET]: import.meta.env.VITE_BACKEND_API
---------------------------------------------------------------------------------
 ```
 
-## Docker and Podman Usage
+## CI/CD Integration
 
-SuriSC can be built and run in a container environment using either Docker or Podman.
+### GitHub Actions (Secret Scan)
 
-### Building the Image
-
-Using **Docker**:
-
-```sh
-docker build -t surisc .
+```yaml
+name: Secret Scan
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Weekly Monday morning
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan staging
+        uses: docker://ghcr.io/marcuwynu23/surisc:latest
+        with:
+          args: -u https://staging.example.com -o json
 ```
 
-Using **Podman**:
+### GitLab CI
 
-```sh
-podman build -t surisc .
+```yaml
+surisc-scan:
+  image: ghcr.io/marcuwynu23/surisc:latest
+  script:
+    - /surisc -u https://example.com -o json
+  artifacts:
+    paths:
+      - surisc-report.json
 ```
 
-### Running the Container
+## Development
 
-Once built, you can run the container by passing your target URL using the `-u` flag.
+### Prerequisites
 
-Using **Docker**:
+| Tool            | Version | Purpose                      |
+| --------------- | ------- | ---------------------------- |
+| Go              | 1.24+   | Compiler                     |
+| Make            | Any     | Build automation             |
+| makensis (NSIS) | Any     | Windows installer (optional) |
+| fpm             | Any     | Debian packaging (optional)  |
 
-```sh
-docker run --rm surisc -u https://example.com
+### Commands
+
+```bash
+make all          # Build binary + installer
+make exe          # Build Windows binary only
+make linux        # Build Linux binary
+make test         # Run all tests
+make clean        # Remove build artifacts
+make deb          # Build Debian package (requires fpm)
 ```
 
-For JSON output:
+### Project Structure
 
-```sh
-docker run --rm surisc -u https://example.com -o json
+```
+surisc/
+├── cmd/surisc/        # CLI entrypoint (flag parsing, output formatting)
+├── internal/
+│   ├── models/        # Data types (Leak, TechInsight)
+│   └── scanner/       # Core scanning engine (colly scraper, regex, entropy)
+├── tests/             # Integration tests
+├── dist/              # Build output (gitignored)
+├── docs/              # Static documentation site (HTML)
+├── logo/              # SVG assets
+├── installer/         # NSIS installer script
+├── .github/workflows/ # CI/CD pipelines
+├── Dockerfile
+├── makefile
+├── go.mod
+└── go.sum
 ```
 
-Using **Podman**:
+## Architecture
 
-```sh
-podman run --rm surisc -u https://example.com
-```
+- **Entrypoint** (`cmd/surisc/main.go`) — Parses CLI flags, validates the target URL, calls the scanner, and renders output
+- **Scraper** (`internal/scanner/scanner.go`) — Uses `colly/v2` with async goroutines to crawl HTML, fetch JS bundles, and extract routes
+- **Analyzer** — Scans content with 20+ compiled regex patterns and Shannon entropy calculations; deduplicates; assigns gravity scores
+- **Profiler** — Fingerprints frontend frameworks (React, Vue, Svelte, etc.), hosting providers (Vercel, Cloudflare, etc.), and security headers
+- **Models** (`internal/models/models.go`) — Go structs for `Leak` (finding) and `TechInsight` (profile) with JSON serialization tags
+- **Output** — HUD formatter (terminal tables) or JSON marshaler for pipeline use
 
-For JSON output:
+---
 
-```sh
-podman run --rm surisc -u https://example.com -o json
-```
+## License
 
-### Using GitHub Container Registry (GHCR)
+[Apache 2.0](LICENSE) — Copyright (c) 2026 Mark Wayne Menorca
 
-You can also run SuriSC directly from the GitHub Container Registry without needing to build it locally.
-
-**Run using Docker**:
-
-```sh
-docker run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com
-```
-
-**Run using Podman**:
-
-```sh
-podman run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com
-```
+Happy Coding! 🚀
