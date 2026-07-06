@@ -1,132 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Install SuriSC - build from source, Docker, Podman, or GitHub Container Registry.">
-<title>Install · SuriSC</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible"
+    content="IE=edge">
+  <meta name="description"
+    content="Install surisc - build from source with Go, or run via Docker, Podman, or GitHub Container Registry. Pre-built binaries available for Windows, Linux, and macOS.">
+  <meta name="keywords"
+    content="surisc, install, Docker, Podman, GitHub Container Registry, build from source">
+  <meta name="author"
+    content="marcuwynu23">
+  <meta name="robots"
+    content="index, follow">
+  <meta name="theme-color"
+    content="#121418">
+  <meta property="og:type"
+    content="website">
+  <meta property="og:title"
+    content="Install · surisc">
+  <meta property="og:description"
+    content="Install surisc - build from source, Docker, Podman, or GitHub Container Registry.">
+  <meta property="og:url"
+    content="https://github.com/marcuwynu23/surisc">
+  <meta property="og:image"
+    content="https://raw.githubusercontent.com/marcuwynu23/surisc/main/docs/assets/favicon.svg">
+  <meta name="twitter:card"
+    content="summary_large_image">
+  <title>Install · surisc</title>
+  <link rel="canonical"
+    href="https://github.com/marcuwynu23/surisc">
+  <link rel="preconnect"
+    href="https://fonts.googleapis.com">
+  <link rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="icon"
+    type="image/svg+xml"
+    href="assets/favicon.svg">
+  <link rel="stylesheet"
+    href="css/style.css">
 </head>
+
 <body>
-<div class="header-bar">
-  <div class="container">
-    <div class="logo-wrap">
-      <a href="/" class="logo">Suri<span class="sc">SC</span></a>
-      <span class="subtitle">Find what your frontend hides.</span>
+  <div class="header-bar">
+    <div class="container">
+      <div class="logo-wrap">
+        <a href="/"><img src="assets/logo.svg"
+            alt="surisc"
+            class="logo-icon"></a>
+        <span class="subtitle">Find what your frontend hides.</span>
+      </div>
+      <nav>
+        <a href="about.html">About</a>
+        <a href="features.html">Features</a>
+        <a href="installation.html">Installation</a>
+        <a href="usage.html">Usage</a>
+      </nav>
+      <button class="hamburger"
+        id="hamburger"
+        aria-label="Menu">
+        <svg width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round">
+          <line x1="3"
+            y1="6"
+            x2="21"
+            y2="6" />
+          <line x1="3"
+            y1="12"
+            x2="21"
+            y2="12" />
+          <line x1="3"
+            y1="18"
+            x2="21"
+            y2="18" />
+        </svg>
+      </button>
     </div>
-    <nav>
-      <a href="about.html">About</a>
-      <a href="features.html">Features</a>
-      <a href="installation.html">Installation</a>
-      <a href="usage.html">Usage</a>
-    </nav>
-    <button class="hamburger" id="hamburger" aria-label="Menu">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-    </button>
   </div>
-</div>
-<div class="drawer-overlay" id="drawerOverlay"></div>
-<div class="drawer" id="drawer">
-  <a href="about.html">About</a>
-  <a href="features.html">Features</a>
-  <a href="installation.html">Installation</a>
-  <a href="usage.html">Usage</a>
-</div>
+  <div class="drawer-overlay"
+    id="drawerOverlay"></div>
+  <div class="drawer"
+    id="drawer">
+    <a href="about.html">About</a>
+    <a href="features.html">Features</a>
+    <a href="installation.html">Installation</a>
+    <a href="usage.html">Usage</a>
+  </div>
 
-<div class="page">
-  <div class="container">
-    <div class="page-header">
-      <h1>Installation</h1>
-      <p>Build from source or run via container.</p>
-    </div>
+  <div class="page">
+    <div class="container">
+      <div class="page-header">
+        <h1>Installation</h1>
+        <p>Build from source or run via container.</p>
+      </div>
 
-    <section>
-      <h2>Downloads</h2>
-      <p>Pre-built binaries for Windows, Linux, and macOS are available on the <a href="https://github.com/marcuwynu23/surisc/releases" target="_blank" rel="noopener" style="color:#3b82f6;">GitHub Releases</a> page. Download the latest release for your platform and run it directly — no build step required.</p>
-      <pre><code><span class="comment"># Example: run the downloaded binary</span>
+      <section>
+        <h2>Downloads</h2>
+        <p>Pre-built binaries for Windows, Linux, and macOS are available on the <a
+            href="https://github.com/marcuwynu23/surisc/releases"
+            target="_blank"
+            rel="noopener"
+            style="color:#3b82f6;">GitHub Releases</a> page. Download the latest release for your platform and run it
+          directly — no build step required.</p>
+        <pre><code><span class="comment"># Example: run the downloaded binary</span>
 <span class="cmd">./surisc -u https://example.com</span></code></pre>
-    </section>
+      </section>
 
-    <section>
-      <h2>Source</h2>
-      <p>Compile using the included Makefile. Requires Go 1.21+.</p>
-      <pre><code><span class="cmd">make all</span>      <span class="comment"># compile into dist/surisc.exe</span>
+      <section>
+        <h2>Source</h2>
+        <p>Compile using the included Makefile. Requires Go 1.21+.</p>
+        <pre><code><span class="cmd">make all</span>      <span class="comment"># compile into dist/surisc.exe</span>
 <span class="cmd">make clean</span>    <span class="comment"># clean build outputs</span>
 <span class="cmd">make test</span>     <span class="comment"># run unit and E2E tests</span></code></pre>
-    </section>
+      </section>
 
-    <section>
-      <h2>Docker</h2>
-      <pre><code><span class="cmd">docker build -t surisc .</span>
+      <section>
+        <h2>Docker</h2>
+        <pre><code><span class="cmd">docker build -t surisc .</span>
 <span class="cmd">docker run --rm surisc -u https://example.com</span></code></pre>
-    </section>
+      </section>
 
-    <section>
-      <h2>Podman</h2>
-      <pre><code><span class="cmd">podman build -t surisc .</span>
+      <section>
+        <h2>Podman</h2>
+        <pre><code><span class="cmd">podman build -t surisc .</span>
 <span class="cmd">podman run --rm surisc -u https://example.com</span></code></pre>
-    </section>
+      </section>
 
-    <section>
-      <h2>GitHub Container Registry</h2>
-      <p>Run directly without building locally.</p>
-      <pre><code><span class="cmd">docker run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com</span></code></pre>
-      <pre><code><span class="cmd">podman run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com</span></code></pre>
-    </section>
-  </div>
-</div>
-
-<footer>
-  <div class="container">
-    <div class="footer-grid">
-      <div class="footer-brand">
-        <a href="/" class="logo">Suri<span class="sc">SC</span></a>
-        <p>A high-performance reconnaissance tool for frontend web security. Written in Go.</p>
-      </div>
-      <div>
-        <h4>Docs</h4>
-        <ul>
-          <li><a href="about.html">About</a></li>
-          <li><a href="features.html">Features</a></li>
-          <li><a href="installation.html">Installation</a></li>
-          <li><a href="usage.html">Usage</a></li>
-        </ul>
-      </div>
-      <div>
-        <h4>Resources</h4>
-        <ul>
-          <li><a href="https://github.com/marcuwynu23/surisc" target="_blank" rel="noopener">GitHub</a></li>
-          <li><a href="https://github.com/marcuwynu23/surisc/releases" target="_blank" rel="noopener">Releases</a></li>
-          <li><a href="https://github.com/marcuwynu23/surisc/issues" target="_blank" rel="noopener">Issues</a></li>
-        </ul>
-      </div>
-      <div>
-        <h4>Legal</h4>
-        <ul>
-          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/LICENSE" target="_blank" rel="noopener">License</a></li>
-          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a></li>
-          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of Conduct</a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>&copy; 2026 <a href="https://github.com/marcuwynu23" target="_blank" rel="noopener">marcuwynu23</a></p>
+      <section>
+        <h2>GitHub Container Registry</h2>
+        <p>Run directly without building locally.</p>
+        <pre><code><span class="cmd">docker run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com</span></code></pre>
+        <pre><code><span class="cmd">podman run --rm ghcr.io/marcuwynu23/surisc:latest -u https://example.com</span></code></pre>
+      </section>
     </div>
   </div>
-</footer>
-<script>
-(function(){
-  var h = document.getElementById('hamburger');
-  var d = document.getElementById('drawer');
-  var o = document.getElementById('drawerOverlay');
-  function open(){ d.classList.add('open'); o.classList.add('open'); o.style.display = 'block'; }
-  function close(){ d.classList.remove('open'); o.classList.remove('open'); setTimeout(function(){ o.style.display = 'none'; }, 250); }
-  if(h) h.addEventListener('click', open);
-  if(o) o.addEventListener('click', close);
-})();
-</script>
+
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="/"
+            class="footer-logo-link"><img src="assets/logo.svg"
+              alt="surisc"
+              class="footer-logo"></a>
+          <p>A high-performance reconnaissance tool for frontend web security. Written in Go.</p>
+        </div>
+        <div>
+          <h4>Docs</h4>
+          <ul>
+            <li><a href="about.html">About</a></li>
+            <li><a href="features.html">Features</a></li>
+            <li><a href="installation.html">Installation</a></li>
+            <li><a href="usage.html">Usage</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Resources</h4>
+          <ul>
+            <li><a href="https://github.com/marcuwynu23/surisc"
+                target="_blank"
+                rel="noopener">GitHub</a></li>
+            <li><a href="https://github.com/marcuwynu23/surisc/releases"
+                target="_blank"
+                rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/marcuwynu23/surisc/issues"
+                target="_blank"
+                rel="noopener">Issues</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="https://github.com/marcuwynu23/surisc/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener">License</a></li>
+            <li><a href="https://github.com/marcuwynu23/surisc/blob/main/SECURITY.md"
+                target="_blank"
+                rel="noopener">Security</a></li>
+            <li><a href="https://github.com/marcuwynu23/surisc/blob/main/CODE_OF_CONDUCT.md"
+                target="_blank"
+                rel="noopener">Code of Conduct</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 <a href="https://github.com/marcuwynu23"
+            target="_blank"
+            rel="noopener">marcuwynu23</a></p>
+      </div>
+    </div>
+  </footer>
+  <script>
+    (function () {
+      var h = document.getElementById('hamburger');
+      var d = document.getElementById('drawer');
+      var o = document.getElementById('drawerOverlay');
+      function open() { d.classList.add('open'); o.classList.add('open'); o.style.display = 'block'; }
+      function close() { d.classList.remove('open'); o.classList.remove('open'); setTimeout(function () { o.style.display = 'none'; }, 250); }
+      if (h) h.addEventListener('click', open);
+      if (o) o.addEventListener('click', close);
+    })();
+  </script>
 </body>
+
 </html>
