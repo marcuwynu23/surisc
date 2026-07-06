@@ -1,168 +1,258 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="SuriSC - A high-performance reconnaissance tool for frontend web security.">
-<title>SuriSC</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible"
+    content="IE=edge">
+  <meta name="description"
+    content="surisc - A high-performance reconnaissance tool that scans JavaScript bundles for leaked API keys, hardcoded credentials, and exposed environment variables.">
+  <meta name="keywords"
+    content="surisc, reconnaissance, frontend, security, scanner, API key leak, secret detection">
+  <meta name="author"
+    content="marcuwynu23">
+  <meta name="robots"
+    content="index, follow">
+  <meta name="theme-color"
+    content="#121418">
+  <meta property="og:type"
+    content="website">
+  <meta property="og:title"
+    content="surisc">
+  <meta property="og:description"
+    content="A high-performance reconnaissance tool for frontend web security.">
+  <meta property="og:url"
+    content="https://github.com/marcuwynu23/surisc">
+  <meta property="og:image"
+    content="https://raw.githubusercontent.com/marcuwynu23/surisc/main/docs/assets/favicon.svg">
+  <meta name="twitter:card"
+    content="summary_large_image">
+  <title>surisc</title>
+  <link rel="canonical"
+    href="https://github.com/marcuwynu23/surisc">
+  <link rel="preconnect"
+    href="https://fonts.googleapis.com">
+  <link rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="icon"
+    type="image/svg+xml"
+    href="assets/favicon.svg">
+  <link rel="stylesheet"
+    href="css/style.css">
 </head>
+
 <body>
-<div class="header-bar">
-  <div class="container">
-    <div class="logo-wrap">
-      <a href="/" class="logo">Suri<span class="sc">SC</span></a>
-      <span class="subtitle">Find what your frontend hides.</span>
-    </div>
-    <nav>
-      <a href="about.html">About</a>
-      <a href="features.html">Features</a>
-      <a href="installation.html">Installation</a>
-      <a href="usage.html">Usage</a>
-    </nav>
-    <button class="hamburger" id="hamburger" aria-label="Menu">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-    </button>
-  </div>
-</div>
-<div class="drawer-overlay" id="drawerOverlay"></div>
-<div class="drawer" id="drawer">
-  <a href="about.html">About</a>
-  <a href="features.html">Features</a>
-  <a href="installation.html">Installation</a>
-  <a href="usage.html">Usage</a>
-</div>
-
-<section class="hero" id="hero">
-  <canvas id="bg-canvas"></canvas>
-  <div class="container" style="position:relative; z-index:1;">
-    <h1>Suri<span class="sc">SC</span></h1>
-    <p>A high-performance reconnaissance tool for frontend web security.</p>
-    <div class="hero-actions">
-      <a href="installation.html" class="btn btn-primary">Get started</a>
-      <a href="https://github.com/marcuwynu23/surisc/releases" class="btn btn-secondary" target="_blank" rel="noopener">Download</a>
-      <a href="https://github.com/marcuwynu23/surisc" class="btn btn-secondary" target="_blank" rel="noopener">GitHub</a>
-    </div>
-  </div>
-</section>
-
-<footer>
-  <div class="container">
-    <div class="footer-grid">
-      <div class="footer-brand">
-        <a href="/" class="logo">Suri<span class="sc">SC</span></a>
-        <p>A high-performance reconnaissance tool for frontend web security. Written in Go.</p>
+  <div class="header-bar">
+    <div class="container">
+      <div class="logo-wrap">
+        <a href="/"><img src="assets/logo.svg"
+            alt="surisc"
+            class="logo-icon"></a>
+        <span class="subtitle">Find what your frontend hides.</span>
       </div>
-      <div>
-        <h4>Docs</h4>
-        <ul>
-          <li><a href="about.html">About</a></li>
-          <li><a href="features.html">Features</a></li>
-          <li><a href="installation.html">Installation</a></li>
-          <li><a href="usage.html">Usage</a></li>
-        </ul>
-      </div>
-      <div>
-        <h4>Resources</h4>
-        <ul>
-          <li><a href="https://github.com/marcuwynu23/surisc" target="_blank" rel="noopener">GitHub</a></li>
-          <li><a href="https://github.com/marcuwynu23/surisc/releases" target="_blank" rel="noopener">Releases</a></li>
-          <li><a href="https://github.com/marcuwynu23/surisc/issues" target="_blank" rel="noopener">Issues</a></li>
-        </ul>
-      </div>
-      <div>
-        <h4>Legal</h4>
-        <ul>
-          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/LICENSE" target="_blank" rel="noopener">License</a></li>
-          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a></li>
-          <li><a href="https://github.com/marcuwynu23/surisc/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of Conduct</a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>&copy; 2026 <a href="https://github.com/marcuwynu23" target="_blank" rel="noopener">marcuwynu23</a></p>
+      <nav>
+        <a href="about.html">About</a>
+        <a href="features.html">Features</a>
+        <a href="installation.html">Installation</a>
+        <a href="usage.html">Usage</a>
+      </nav>
+      <button class="hamburger"
+        id="hamburger"
+        aria-label="Menu">
+        <svg width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round">
+          <line x1="3"
+            y1="6"
+            x2="21"
+            y2="6" />
+          <line x1="3"
+            y1="12"
+            x2="21"
+            y2="12" />
+          <line x1="3"
+            y1="18"
+            x2="21"
+            y2="18" />
+        </svg>
+      </button>
     </div>
   </div>
-</footer>
-<script>
-(function(){
-  var hamburger = document.getElementById('hamburger');
-  var drawer = document.getElementById('drawer');
-  var overlay = document.getElementById('drawerOverlay');
-  function openDrawer(){ drawer.classList.add('open'); overlay.classList.add('open'); overlay.style.display = 'block'; }
-  function closeDrawer(){ drawer.classList.remove('open'); overlay.classList.remove('open'); setTimeout(function(){ overlay.style.display = 'none'; }, 250); }
-  if(hamburger){ hamburger.addEventListener('click', openDrawer); }
-  if(overlay){ overlay.addEventListener('click', closeDrawer); }
-})();
-(function(){
-  var canvas = document.getElementById('bg-canvas');
-  var hero = document.getElementById('hero');
-  var ctx = canvas.getContext('2d');
-  var W, H;
-  function resize(){
-    var rect = hero.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    W = canvas.width;
-    H = canvas.height;
-  }
-  resize();
-  window.addEventListener('resize', resize);
+  <div class="drawer-overlay"
+    id="drawerOverlay"></div>
+  <div class="drawer"
+    id="drawer">
+    <a href="about.html">About</a>
+    <a href="features.html">Features</a>
+    <a href="installation.html">Installation</a>
+    <a href="usage.html">Usage</a>
+  </div>
 
-  var hexagons = [];
-  var COUNT = 40;
-  for(var i=0;i<COUNT;i++){
-    hexagons.push({
-      x: Math.random() * W,
-      y: Math.random() * H,
-      r: 10 + Math.random() * 30,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: -0.2 - Math.random() * 0.4,
-      rot: Math.random() * Math.PI * 2,
-      vr: (Math.random() - 0.5) * 0.01,
-      alpha: 0.1 + Math.random() * 0.3
-    });
-  }
+  <section class="hero"
+    id="hero">
+    <canvas id="bg-canvas"></canvas>
+    <div class="container"
+      style="position:relative; z-index:1;">
+      <img src="assets/logo.svg"
+        alt="surisc"
+        class="hero-logo">
+      <p>A high-performance reconnaissance tool for frontend web security.</p>
+      <div class="hero-actions">
+        <a href="installation.html"
+          class="btn btn-primary">Get started</a>
+        <a href="https://github.com/marcuwynu23/surisc/releases"
+          class="btn btn-secondary"
+          target="_blank"
+          rel="noopener">Download</a>
+        <a href="https://github.com/marcuwynu23/surisc"
+          class="btn btn-secondary"
+          target="_blank"
+          rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </section>
 
-  function drawHex(cx, cy, r, rot){
-    ctx.beginPath();
-    for(var i=0;i<6;i++){
-      var angle = rot + i * Math.PI / 3;
-      var x = cx + r * Math.cos(angle);
-      var y = cy + r * Math.sin(angle);
-      if(i===0) ctx.moveTo(x,y);
-      else ctx.lineTo(x,y);
-    }
-    ctx.closePath();
-    ctx.stroke();
-  }
-
-  function animate(){
-    ctx.clearRect(0, 0, W, H);
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 1;
-    for(var i=0;i<hexagons.length;i++){
-      var h = hexagons[i];
-      h.x += h.vx;
-      h.y += h.vy;
-      h.rot += h.vr;
-      if(h.y + h.r < 0){
-        h.y = H + h.r;
-        h.x = Math.random() * W;
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="/"
+            class="footer-logo-link"><img src="assets/logo.svg"
+              alt="surisc"
+              class="footer-logo"></a>
+          <p>A high-performance reconnaissance tool for frontend web security. Written in Go.</p>
+        </div>
+        <div>
+          <h4>Docs</h4>
+          <ul>
+            <li><a href="about.html">About</a></li>
+            <li><a href="features.html">Features</a></li>
+            <li><a href="installation.html">Installation</a></li>
+            <li><a href="usage.html">Usage</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Resources</h4>
+          <ul>
+            <li><a href="https://github.com/marcuwynu23/surisc"
+                target="_blank"
+                rel="noopener">GitHub</a></li>
+            <li><a href="https://github.com/marcuwynu23/surisc/releases"
+                target="_blank"
+                rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/marcuwynu23/surisc/issues"
+                target="_blank"
+                rel="noopener">Issues</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="https://github.com/marcuwynu23/surisc/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener">License</a></li>
+            <li><a href="https://github.com/marcuwynu23/surisc/blob/main/SECURITY.md"
+                target="_blank"
+                rel="noopener">Security</a></li>
+            <li><a href="https://github.com/marcuwynu23/surisc/blob/main/CODE_OF_CONDUCT.md"
+                target="_blank"
+                rel="noopener">Code of Conduct</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 <a href="https://github.com/marcuwynu23"
+            target="_blank"
+            rel="noopener">marcuwynu23</a></p>
+      </div>
+    </div>
+  </footer>
+  <script>
+    (function () {
+      var hamburger = document.getElementById('hamburger');
+      var drawer = document.getElementById('drawer');
+      var overlay = document.getElementById('drawerOverlay');
+      function openDrawer() { drawer.classList.add('open'); overlay.classList.add('open'); overlay.style.display = 'block'; }
+      function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('open'); setTimeout(function () { overlay.style.display = 'none'; }, 250); }
+      if (hamburger) { hamburger.addEventListener('click', openDrawer); }
+      if (overlay) { overlay.addEventListener('click', closeDrawer); }
+    })();
+    (function () {
+      var canvas = document.getElementById('bg-canvas');
+      var hero = document.getElementById('hero');
+      var ctx = canvas.getContext('2d');
+      var W, H;
+      function resize() {
+        var rect = hero.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        W = canvas.width;
+        H = canvas.height;
       }
-      if(h.x + h.r < 0) h.x = W + h.r;
-      if(h.x - h.r > W) h.x = -h.r;
-      ctx.globalAlpha = h.alpha;
-      drawHex(h.x, h.y, h.r, h.rot);
-    }
-    ctx.globalAlpha = 1;
-    requestAnimationFrame(animate);
-  }
-  animate();
-})();
-</script>
+      resize();
+      window.addEventListener('resize', resize);
+
+      var hexagons = [];
+      var COUNT = 40;
+      for (var i = 0; i < COUNT; i++) {
+        hexagons.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: 10 + Math.random() * 30,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: -0.2 - Math.random() * 0.4,
+          rot: Math.random() * Math.PI * 2,
+          vr: (Math.random() - 0.5) * 0.01,
+          alpha: 0.1 + Math.random() * 0.3
+        });
+      }
+
+      function drawHex(cx, cy, r, rot) {
+        ctx.beginPath();
+        for (var i = 0; i < 6; i++) {
+          var angle = rot + i * Math.PI / 3;
+          var x = cx + r * Math.cos(angle);
+          var y = cy + r * Math.sin(angle);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 1;
+        for (var i = 0; i < hexagons.length; i++) {
+          var h = hexagons[i];
+          h.x += h.vx;
+          h.y += h.vy;
+          h.rot += h.vr;
+          if (h.y + h.r < 0) {
+            h.y = H + h.r;
+            h.x = Math.random() * W;
+          }
+          if (h.x + h.r < 0) h.x = W + h.r;
+          if (h.x - h.r > W) h.x = -h.r;
+          ctx.globalAlpha = h.alpha;
+          drawHex(h.x, h.y, h.r, h.rot);
+        }
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(animate);
+      }
+      animate();
+    })();
+  </script>
 </body>
+
 </html>
