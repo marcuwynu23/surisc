@@ -2,20 +2,48 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+| Version | Supported |
+|---|---|
+| 2.x | Yes |
+| 1.1.x | Yes |
+| < 1.1 | No |
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+SuriSC scans for leaked credentials, but if you find a vulnerability **in the tool itself**, please report it responsibly.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+**Do not** open a public GitHub issue. Instead, email `help@marcuwynu.space` with:
+
+1. A description of the vulnerability
+2. Steps to reproduce
+3. Potential impact
+4. Any suggested fix (optional)
+
+You can expect:
+
+- **Acknowledgment** within 48 hours
+- **Status update** within 5 business days
+- **Fix timeline** once the issue is confirmed and prioritized
+
+We believe in coordinated disclosure. Please give us reasonable time to address the issue before publicizing it.
+
+## Scope
+
+This security policy covers:
+
+- The SuriSC CLI tool and its source code
+- CI/CD pipeline definitions
+- Docker images published to GHCR
+
+Out of scope:
+
+- Third-party dependencies (report those to their respective maintainers)
+- Targets scanned *by* SuriSC (those are users' own security concerns)
+
+## Safe Usage
+
+When running SuriSC:
+
+- Only scan targets you own or have explicit permission to test
+- Avoid high-frequency scanning that could constitute a denial-of-service attack
+- Review findings responsibly — a leaked key should be revoked, not exploited
