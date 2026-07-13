@@ -1,43 +1,19 @@
 # Release Notes
 
-## Version
+## v2.1.1 — Hosting Detection & Framework Fingerprinting
 
-v2.1.1
+### Highlights
 
-## Release Date
+Added hosting provider fingerprinting (15+ providers), frontend framework detection including Alpine.js, and target reachability validation.
 
-2026-07-13
+### What's New
 
-## Summary
+- **Hosting provider detection** — Automatically identifies 15+ hosting providers from response headers and content signatures: Vercel, Netlify, Cloudflare (Pages/Workers/Proxied), Heroku, Railway, GitHub Pages, GitLab Pages, Render, Fly.io, Firebase, AWS Amplify, Azure Static Web Apps, Surge, and Glitch
+- **Alpine.js detection** — Identifies Alpine.js via `x-data`, `x-init`, `x-show`, and other Alpine-specific attributes
+- **Vanilla JS fallback** — When no major framework is detected, reports "Vanilla JS" instead of leaving frontend field empty
+- **Target reachability validation** — Pre-scan check validates the target is reachable and responsive before starting the scan, with intelligent retry handling
+- **Route extraction improvements** — Better filtering of template routes (`/:id`), filesystem paths (`/etc/`), and doc files (`.md`, `.mdx`)
 
-- 6 features
-- 1 bug fixes
-- 1 maintenance
+### Bug Fixes
 
----
-
-## Features
-
-- Enhance target reachability validation with 5xx error handling
-- Add target reachability validation before scanning
-- Add Alpine.js detection to scanner
-- Add vanilla JS fallback for frontend detection in scanner
-- Enhance route extraction and filtering in scanner
-- Add hosting provider detection to scanner insights
-
-## Bug Fixes
-
-- Clarify SPA detection terminology in README
-
-## Maintenance
-
-- Update CHANGELOG for version 2.1.0
-
-## Contributors
-
-- Mark Wayne Menorca (8 commits)
-
-## Full Changelog
-
-v2.1.0...v2.1.1
-
+- Clarified SPA detection terminology in documentation
