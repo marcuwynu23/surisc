@@ -1,16 +1,11 @@
 # Release Notes
 
-## Version
+## v2.2.0-next — Upcoming
 
-v2.2.0-next
+### Highlights
 
-## Release Date
-
-2026-07-13
+Release notes infrastructure added. Future changes will be documented here before the next stable release.
 
 ---
 
-## Full Changelog
-
-v2.2.0...HEAD
-
+**Full changelog:** `v2.2.0...HEAD`
