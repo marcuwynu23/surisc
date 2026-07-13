@@ -143,13 +143,13 @@ surisc -u https://example.com -i robots   # robots.txt only
 surisc -u https://example.com -i sitemaps # sitemap.xml only
 ```
 
-| Flag            | Default | Scope                                       |
-| --------------- | ------- | ------------------------------------------- |
-| `-i` / `-i all` | —       | All informative sections                    |
-| `-i webinfo`    | —       | Server info, security headers, cookies, JWT |
-| `-i routes`     | —       | Discovered routes + attack-surface probes   |
-| `-i robots`     | —       | `robots.txt` content                        |
-| `-i sitemaps`   | —       | `sitemap.xml` content                       |
+| Flag            | Default | Scope                                                               |
+| --------------- | ------- | ------------------------------------------------------------------- |
+| `-i` / `-i all` | —       | All informative sections                                            |
+| `-i webinfo`    | —       | Server info, security headers, cookies, JWT, API specs, GraphQL     |
+| `-i routes`     | —       | Discovered routes + attack-surface probes + API spec references     |
+| `-i robots`     | —       | `robots.txt` content                                                |
+| `-i sitemaps`   | —       | `sitemap.xml` content                                               |
 
 #### Examples by Use Case
 
@@ -159,7 +159,7 @@ surisc -u https://example.com -i sitemaps # sitemap.xml only
 surisc -u https://example.com -i webinfo
 ```
 
-Output includes a table with: Backend, Frontend, Hosting, Server, Protocol, CDN/WAF, CMS, SPA, PWA, CSP, X-Frame-Options, HSTS, ACAO, Cookie Security, and JWT Indicators.
+Output includes a table with: Backend, Frontend, Hosting, Server, Protocol, CDN/WAF, CMS, SPA, PWA, CSP, X-Frame-Options, HSTS, ACAO, Cookie Security, JWT Indicators, API Specs, and GraphQL Introspection.
 
 **Full route discovery:**
 
@@ -168,6 +168,13 @@ surisc -u https://example.com -i routes
 ```
 
 Discovers routes from HTML attributes (`href`, `src`, `action`), inline JavaScript string literals, JSON payloads, and probes common paths (`/admin`, `/api`, `/auth`, `/dashboard`, `/graphql`).
+
+**API spec discovery and GraphQL introspection:**
+
+When running `-i` (or `-i webinfo`), SuriSC automatically:
+- Probes 10 common OpenAPI/Swagger spec paths (`/swagger.json`, `/openapi.json`, `/api/docs`, etc.) and validates responses for `swagger`/`openapi` keys
+- Scans JavaScript bundles for Swagger/OpenAPI version references and Swagger UI tooling
+- Sends an introspection query (`{ __schema { types { name } } }`) to common GraphQL endpoints (`/graphql`, `/api/graphql`, `/v1/graphql`, `/graph`) and reports whether introspection is enabled or disabled
 
 ---
 
@@ -238,6 +245,8 @@ where `p(i)` is the probability of character `i` appearing in the string.
 | `CLOUDFLARE_EXPOSED_CREDENTIAL` | Global key / API token          | 9.5–10.0              |
 | `USER_API_TOKEN`                | Assignment with entropy > 3.0   | 8.8                   |
 | `RSA_PRIVATE_KEY`               | PEM-encoded private key         | 10.0                  |
+| `FIREBASE_CONFIG_LEAK`          | `firebaseConfig`/`initializeApp` with exposed `apiKey` | 8.5 |
+| `SUPABASE_CONFIG_LEAK`          | `supabaseUrl`/`supabaseKey` assignments | 8.0–9.0         |
 | `MAP_FILE_REFERENCE`            | `sourceMappingURL=...map`       | 5.0                   |
 | `BEARER_TOKEN`                  | `Bearer ...`                    | 7.0 + (entropy × 0.5) |
 | `INTERNAL_IP_ADDRESS`           | `10.x`, `172.16.x`, `192.168.x` | 6.5                   |

@@ -39,10 +39,12 @@ The name combines **suri** (Tagalog: "examine" or "analyze") with **SC** for **s
 ### What It Does
 
 - **Scrapes** — Discovers every `<script>` tag on a page and fetches its payload without writing files to disk
-- **Detects** — 20+ secret types including AWS keys, Stripe secrets, GitHub PATs, Google API keys, and more
+- **Detects** — 25+ secret types including AWS keys, Stripe secrets, GitHub PATs, Google API keys, Firebase/Supabase configs, and more
+- **Ingests** — Fetches source map (`.map`) files and recursively scans their original source code for secrets
 - **Analyzes** — Shannon entropy scoring flags high-density strings that look like real credentials
 - **Profiles** — Identifies technology stack, hosting provider, CDN, CMS, SPA/PWA status, and security headers
 - **Discovers** — Routes from HTML, JS, JSON, `robots.txt`, and `sitemap.xml`; probes attack-surface paths
+- **Probes** — Detects GraphQL introspection endpoints, OpenAPI/Swagger spec files, and API documentation pages
 - **Filters** — Built-in false positive suppression ignores compilation artifacts, placeholder values, and standard library internals
 - **Reports** — Human-readable HUD output and machine-readable JSON with gravity scores for triage
 
@@ -50,12 +52,15 @@ The name combines **suri** (Tagalog: "examine" or "analyze") with **SC** for **s
 
 | Problem                                         | How SuriSC Solves It                                                               |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Accidental API key commits to public JS bundles | Scans every fetched script for 20+ credential patterns with gravity scoring        |
+| Accidental API key commits to public JS bundles | Scans every fetched script for 25+ credential patterns with gravity scoring        |
 | `import.meta.env` leaks in Vite/CRA builds      | Detects `VITE_API_URL`, `SUPER_SECRET_TOKEN`, etc.                                 |
-| Source map exposure                             | Flags `.map` references that can reveal full server-side source                    |
+| Source map exposure                             | Fetches `.map` files and recursively scans original source code for secrets        |
+| Firebase/Supabase configs in client bundles     | Detects `firebaseConfig` objects and `supabaseUrl`/`supabaseKey` assignments       |
 | Unknown tech stack during recon                 | Fingerprints frontend framework, hosting, CDN, CMS, and security headers           |
 | Manual route enumeration takes too long         | Extracts routes from HTML, JS, JSON, `robots.txt`, and `sitemap.xml` automatically |
 | SPA fallback pages hide real endpoints          | Validates probed routes against 404 signatures to filter SPA shell responses       |
+| GraphQL introspection left enabled              | Probes common GraphQL endpoints with `__schema` introspection query                |
+| Exposed API documentation                       | Probes `/swagger.json`, `/openapi.json`, `/api/docs`, and detects spec refs in JS  |
 
 ### The Philosophy
 

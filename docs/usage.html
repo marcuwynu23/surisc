@@ -119,16 +119,17 @@
         <p>The <code>-i</code> flag skips secret scanning and focuses on target profiling. Supported scopes:</p>
         <ul class="desc-list">
           <li><strong>-i</strong> or <strong>-i all</strong> All informative sections</li>
-          <li><strong>-i serverinfo</strong> Infrastructure and security headers</li>
-          <li><strong>-i routes</strong> Discovered routes and hidden path probe results</li>
+          <li><strong>-i webinfo</strong> Infrastructure, security headers, API specs, GraphQL introspection</li>
+          <li><strong>-i routes</strong> Discovered routes, hidden path probes, API spec references</li>
           <li><strong>-i robots</strong> robots.txt audit</li>
           <li><strong>-i sitemaps</strong> sitemap.xml audit</li>
         </ul>
         <pre><code><span class="cmd">surisc -u https://example.com -i</span>
-<span class="cmd">surisc -u https://example.com -i serverinfo</span>
+<span class="cmd">surisc -u https://example.com -i webinfo</span>
 <span class="cmd">surisc -u https://example.com -i routes</span>
 <span class="cmd">surisc -u https://example.com -i robots</span>
 <span class="cmd">surisc -u https://example.com -i sitemaps</span></code></pre>
+        <p><strong>New in this release:</strong> <code>-i</code> mode now automatically probes 10 OpenAPI/Swagger spec paths and detects references in JS bundles. It also tests common GraphQL endpoints for enabled introspection via a <code>__schema</code> query. Results appear in the webinfo table and routes section.</p>
       </section>
 
       <section>

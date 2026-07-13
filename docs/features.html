@@ -122,6 +122,9 @@
           <div class="item"><strong>Env Leaks</strong><span>import.meta.env.* build-time leaks</span></div>
           <div class="item"><strong>Generic Secrets</strong><span>Variable assignments like API_KEY:"value"</span></div>
           <div class="item"><strong>Map Files</strong><span>Exposed .map dependency files</span></div>
+          <div class="item"><strong>Firebase Config Leak</strong><span>firebaseConfig/initializeApp with exposed apiKey</span></div>
+          <div class="item"><strong>Supabase Config Leak</strong><span>supabaseUrl/supabaseKey variable assignments</span></div>
+          <div class="item"><strong>Source Map Ingestion</strong><span>Recursively scans .map file original sources for secrets</span></div>
         </div>
       </section>
 
@@ -137,6 +140,10 @@
               sitemap.xml</span></div>
           <div class="item"><strong>Attack-surface Probing</strong><span>Common paths: /admin, /api, /auth, /dashboard,
               /graphql</span></div>
+          <div class="item"><strong>API Spec Discovery</strong><span>Probes 10 paths for OpenAPI/Swagger specs and detects
+              references in JS bundles</span></div>
+          <div class="item"><strong>GraphQL Introspection</strong><span>Queries /graphql endpoints for enabled
+              introspection</span></div>
         </div>
       </section>
 
