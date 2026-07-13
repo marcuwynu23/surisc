@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -49,6 +50,21 @@ var (
 	rxAbsoluteURL      = regexp.MustCompile(`https?://[A-Za-z0-9\.\-]+(?:\:[0-9]+)?\/[A-Za-z0-9._~!$&()*+,;=:@%\-\/]*`)
 	rxJWTLike          = regexp.MustCompile(`^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$`)
 	rxWhitespace       = regexp.MustCompile(`\s+`)
+
+	// Firebase config detection
+	rxFirebaseConfig = regexp.MustCompile(`(?i)(?:firebaseConfig|fbConfig|firebase_config)\s*[=:]\s*\{[^}]*apiKey\s*:\s*["'](AIza[0-9A-Za-z\-_]{35})["']`)
+	rxFirebaseInit   = regexp.MustCompile(`(?i)firebase\.initializeApp\s*\(\s*\{[^}]*apiKey\s*:\s*["'](AIza[0-9A-Za-z\-_]{35})["']`)
+
+	// Supabase config detection
+	rxSupabaseURL = regexp.MustCompile(`(?i)(?:supabaseUrl|supabase_url|SUPABASE_URL)\s*[=:]\s*["'](https://[a-zA-Z0-9\-_]+\.supabase\.co)["']`)
+	rxSupabaseKey = regexp.MustCompile(`(?i)(?:supabaseKey|supabase_key|SUPABASE_KEY|SUPABASE_ANON_KEY|supabaseAnonKey)\s*[=:]\s*["']([a-zA-Z0-9\-_\.]{20,})["']`)
+
+	// Swagger/OpenAPI reference patterns
+	rxSwaggerVersion = regexp.MustCompile(`["']?(?:swagger|openapi)["']?\s*:\s*["']?([0-9]+\.[0-9]+)["']?`)
+	rxSwaggerUI      = regexp.MustCompile(`(?i)(?:swagger-ui|swaggerui|swagger\.js|@apidevtools|swagger-client|openapi-client|swagger-parser)`)
+
+	// Source map URL extraction
+	rxMapFileURL = regexp.MustCompile(`sourceMappingURL=(\S+\.map)`)
 )
 
 func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.TechInsight) {
@@ -169,6 +185,26 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 			insightMutex.Unlock()
 			for _, p := range probe.existingPaths {
 				addRoute(p, mustParseURL(targetURL), routeSet, &routesMutex)
+			}
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			specs := probeAPISpecs(targetURL)
+			insightMutex.Lock()
+			insight.APISpecs = specs
+			insightMutex.Unlock()
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result := probeGraphQLIntrospection(targetURL)
+			if result != "" {
+				insightMutex.Lock()
+				insight.GraphQLIntrospection = result
+				insightMutex.Unlock()
 			}
 		}()
 	}
@@ -321,6 +357,9 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		}
 		if strings.Contains(ctype, "javascript") || strings.Contains(ctype, "json") || strings.Contains(ctype, "text/html") || strings.HasSuffix(r.Request.URL.Path, ".js") {
 			extractRoutesFromContent(r.Body, r.Request.URL, contentRouteSet, &contentRoutesMutex)
+			if informativeOnly {
+				detectAPISpecRefsInContent(r.Body, r.Request.URL.Path, &insight, &insightMutex)
+			}
 		}
 		if !informativeOnly && (strings.Contains(ctype, "javascript") || strings.Contains(ctype, "json") || strings.HasSuffix(r.Request.URL.Path, ".js")) {
 			content := make([]byte, len(r.Body))
@@ -341,6 +380,11 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	c.Visit(targetURL)
 	c.Wait()
 	wg.Wait()
+
+	if !informativeOnly {
+		processSourceMaps(&leaks, &leaksMutex)
+	}
+
 	if insight.SPA == "" {
 		insight.SPA = "No"
 	}
@@ -1002,6 +1046,130 @@ func isLikelyFallbackResponse(contentType, sig, homeSig, missingSig string) bool
 	return false
 }
 
+func probeAPISpecs(baseURL string) []string {
+	paths := []string{
+		"/swagger.json",
+		"/api/docs",
+		"/openapi.json",
+		"/api/swagger",
+		"/api/v1/openapi.json",
+		"/api/v1/swagger.json",
+		"/api/v2/swagger.json",
+		"/api/v3/swagger.json",
+		"/docs/swagger.json",
+		"/docs/api-docs",
+	}
+
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return nil
+	}
+	client := newScannerHTTPClient()
+	var found []string
+
+	for _, p := range paths {
+		u := base.ResolveReference(&url.URL{Path: p}).String()
+		req, err := http.NewRequest("GET", u, nil)
+		if err != nil {
+			continue
+		}
+		applyBrowserHeaders(req)
+		req.Header.Set("Accept", "application/json, text/html")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
+		resp.Body.Close()
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			continue
+		}
+
+		ctype := resp.Header.Get("Content-Type")
+		bodyStr := string(body)
+
+		if strings.Contains(ctype, "json") || strings.HasSuffix(p, ".json") {
+			var data interface{}
+			if json.Unmarshal(body, &data) == nil {
+				if m, ok := data.(map[string]interface{}); ok {
+					if sw, hasSw := m["swagger"]; hasSw {
+						found = append(found, fmt.Sprintf("Swagger %s at %s", sw, p))
+					}
+					if ov, hasOv := m["openapi"]; hasOv {
+						found = append(found, fmt.Sprintf("OpenAPI %s at %s", ov, p))
+					}
+				}
+			}
+		} else if strings.Contains(ctype, "html") {
+			if strings.Contains(bodyStr, "swagger") && (strings.Contains(bodyStr, "swagger-ui") || strings.Contains(bodyStr, "SwaggerUI")) {
+				found = append(found, fmt.Sprintf("Swagger UI at %s", p))
+			}
+		}
+	}
+
+	return found
+}
+
+func probeGraphQLIntrospection(baseURL string) string {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return ""
+	}
+
+	paths := []string{"/graphql", "/api/graphql", "/v1/graphql", "/graph"}
+	query := `{"query":"{ __schema { types { name } } }"}`
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	for _, p := range paths {
+		graphqlURL := u.ResolveReference(&url.URL{Path: p}).String()
+		req, err := http.NewRequest("POST", graphqlURL, strings.NewReader(query))
+		if err != nil {
+			continue
+		}
+		applyBrowserHeaders(req)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
+		resp.Body.Close()
+
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			if strings.Contains(string(body), `"__schema"`) {
+				return "Enabled at " + p
+			}
+			return "Disabled at " + p
+		}
+	}
+	return ""
+}
+
+func detectAPISpecRefsInContent(body []byte, path string, insight *models.TechInsight, mu *sync.Mutex) {
+	var refs []string
+
+	if matches := rxSwaggerVersion.FindAllSubmatch(body, -1); len(matches) > 0 {
+		for _, m := range matches {
+			if len(m) > 1 {
+				refs = append(refs, fmt.Sprintf("Swagger/OpenAPI %s referenced in %s", m[1], path))
+			}
+		}
+	}
+
+	if rxSwaggerUI.Match(body) {
+		refs = append(refs, fmt.Sprintf("Swagger UI tools referenced in %s", path))
+	}
+
+	if len(refs) > 0 {
+		mu.Lock()
+		insight.APISpecs = append(insight.APISpecs, refs...)
+		mu.Unlock()
+	}
+}
+
 func cookiesFromHeader(h *http.Header) []*http.Cookie {
 	if h == nil {
 		return nil
@@ -1308,7 +1476,59 @@ func analyzeContent(sourceURL string, content []byte, leaks *[]models.Leak, mute
 		}
 	}
 
-	// 8. Long Hardcoded Secret Strings
+	// 8. Firebase Config Leaks
+	if matches := rxFirebaseConfig.FindAllSubmatch(content, -1); matches != nil {
+		for _, m := range matches {
+			if len(m) > 1 {
+				localLeaks = append(localLeaks, models.Leak{
+					LeakType:     models.LeakTypeFirebaseConfig,
+					SourceURL:    sourceURL,
+					GravityScore: 8.5,
+					Snippet:      truncate(string(m[0]), 100),
+				})
+			}
+		}
+	}
+	if matches := rxFirebaseInit.FindAllSubmatch(content, -1); matches != nil {
+		for _, m := range matches {
+			if len(m) > 1 {
+				localLeaks = append(localLeaks, models.Leak{
+					LeakType:     models.LeakTypeFirebaseConfig,
+					SourceURL:    sourceURL,
+					GravityScore: 8.5,
+					Snippet:      truncate(string(m[0]), 100),
+				})
+			}
+		}
+	}
+
+	// 9. Supabase Config Leaks
+	if matches := rxSupabaseURL.FindAllSubmatch(content, -1); matches != nil {
+		for _, m := range matches {
+			if len(m) > 1 {
+				localLeaks = append(localLeaks, models.Leak{
+					LeakType:     models.LeakTypeSupabaseConfig,
+					SourceURL:    sourceURL,
+					GravityScore: 8.0,
+					Snippet:      truncate(string(m[0]), 100),
+				})
+			}
+		}
+	}
+	if matches := rxSupabaseKey.FindAllSubmatch(content, -1); matches != nil {
+		for _, m := range matches {
+			if len(m) > 1 {
+				localLeaks = append(localLeaks, models.Leak{
+					LeakType:     models.LeakTypeSupabaseConfig,
+					SourceURL:    sourceURL,
+					GravityScore: 9.0,
+					Snippet:      truncate(string(m[0]), 100),
+				})
+			}
+		}
+	}
+
+	// 10. Long Hardcoded Secret Strings
 	if matches := rxSecretString.FindAll(content, -1); matches != nil {
 		for _, m := range matches {
 			s := string(m)
@@ -1416,6 +1636,98 @@ func isLikelyNonSecretHighEntropy(secret string) bool {
 		}
 	}
 	return false
+}
+
+func processSourceMaps(leaks *[]models.Leak, leaksMutex *sync.Mutex) {
+	var mapEntries []struct {
+		url      string
+		sourceURL string
+	}
+
+	leaksMutex.Lock()
+	for _, leak := range *leaks {
+		if leak.LeakType != models.LeakTypeMapFile {
+			continue
+		}
+		u := extractMapURL(leak.Snippet, leak.SourceURL)
+		if u != "" {
+			mapEntries = append(mapEntries, struct {
+				url      string
+				sourceURL string
+			}{u, leak.SourceURL})
+		}
+	}
+	leaksMutex.Unlock()
+
+	if len(mapEntries) == 0 {
+		return
+	}
+
+	seen := make(map[string]struct{})
+	var urls []string
+	for _, entry := range mapEntries {
+		if _, ok := seen[entry.url]; !ok {
+			seen[entry.url] = struct{}{}
+			urls = append(urls, entry.url)
+		}
+	}
+
+	client := newScannerHTTPClient()
+	var wg sync.WaitGroup
+
+	for _, mapURL := range urls {
+		wg.Add(1)
+		go func(u string) {
+			defer wg.Done()
+			body, err := fetchContent(client, u)
+			if err != nil {
+				return
+			}
+
+			var smData struct {
+				Sources        []string `json:"sources"`
+				SourcesContent []string `json:"sourcesContent"`
+			}
+			if err := json.Unmarshal(body, &smData); err != nil {
+				return
+			}
+
+			for i, srcContent := range smData.SourcesContent {
+				if srcContent == "" {
+					continue
+				}
+				sourceName := ""
+				if i < len(smData.Sources) {
+					sourceName = smData.Sources[i]
+				}
+				sourceLabel := u + " (" + sourceName + ")"
+				analyzeContent(sourceLabel, []byte(srcContent), leaks, leaksMutex)
+			}
+		}(mapURL)
+	}
+	wg.Wait()
+}
+
+func extractMapURL(snippet, sourceURL string) string {
+	matches := rxMapFileURL.FindStringSubmatch(snippet)
+	if len(matches) < 2 {
+		return ""
+	}
+	mapPath := strings.TrimSpace(matches[1])
+	if mapPath == "" {
+		return ""
+	}
+
+	base, err := url.Parse(sourceURL)
+	if err != nil {
+		return ""
+	}
+	ref, err := url.Parse(mapPath)
+	if err != nil {
+		return ""
+	}
+	abs := base.ResolveReference(ref)
+	return abs.String()
 }
 
 func dedupeLeaks(in []models.Leak) []models.Leak {
@@ -1563,6 +1875,23 @@ func newScannerHTTPClient() *http.Client {
 			IdleConnTimeout:     30 * time.Second,
 		},
 	}
+}
+
+func fetchContent(client *http.Client, urlStr string) ([]byte, error) {
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	applyBrowserHeaders(req)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("bad status: %d", resp.StatusCode)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
 }
 
 func addRoute(raw string, baseURL *url.URL, routeSet map[string]struct{}, mu *sync.Mutex) {

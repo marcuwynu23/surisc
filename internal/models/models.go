@@ -23,7 +23,9 @@ const (
 	LeakTypeSquareToken  LeakType = "SQUARE_ACCESS_TOKEN"
 	LeakTypeCloudflare   LeakType = "CLOUDFLARE_EXPOSED_CREDENTIAL"
 	LeakTypeUserAPIToken LeakType = "USER_API_TOKEN"
-	LeakTypeRSAPrivate   LeakType = "RSA_PRIVATE_KEY"
+	LeakTypeRSAPrivate     LeakType = "RSA_PRIVATE_KEY"
+	LeakTypeFirebaseConfig LeakType = "FIREBASE_CONFIG_LEAK"
+	LeakTypeSupabaseConfig LeakType = "SUPABASE_CONFIG_LEAK"
 )
 
 type Leak struct {
@@ -53,4 +55,6 @@ type TechInsight struct {
 	ProbedRoutes          []string `json:"probed_routes,omitempty"`
 	RobotsTxt             string   `json:"robots_txt,omitempty"`
 	SitemapXML            string   `json:"sitemap_xml,omitempty"`
+	APISpecs              []string `json:"api_specs,omitempty"`
+	GraphQLIntrospection  string   `json:"graphql_introspection,omitempty"`
 }

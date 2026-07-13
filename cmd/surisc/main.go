@@ -74,6 +74,8 @@ func main() {
 					{"ACAO", insight.AccessControlAllowOrigin},
 					{"Cookie Security", fmt.Sprintf("%d findings", len(insight.CookieSecurity))},
 					{"JWT Indicators", fmt.Sprintf("%d findings", len(insight.JWTIndicators))},
+					{"API Specs", fmt.Sprintf("%d found", len(insight.APISpecs))},
+					{"GraphQL Introspection", orDefault(insight.GraphQLIntrospection, "-")},
 				})
 			}
 			if showRoutes && len(insight.Routes) > 0 {
@@ -81,6 +83,9 @@ func main() {
 			}
 			if showRoutes && len(insight.ProbedRoutes) > 0 {
 				printListSection("Hidden Routes / Attack Surface", insight.ProbedRoutes)
+			}
+			if showRoutes && len(insight.APISpecs) > 0 {
+				printListSection("API Specifications", insight.APISpecs)
 			}
 			if showRobots && insight.RobotsTxt != "" {
 				printRobotsTable(insight.RobotsTxt)
@@ -90,7 +95,7 @@ func main() {
 			}
 
 			hasOutput := false
-			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Hosting != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "" || insight.PWA != "" || insight.ContentSecurityPolicy != "" || insight.XFrameOptions != "" || insight.StrictTransportSecurity != "" || insight.AccessControlAllowOrigin != "" || len(insight.CookieSecurity) > 0 || len(insight.JWTIndicators) > 0) {
+			if showServerInfo && (insight.Backend != "" || insight.Frontend != "" || insight.Hosting != "" || insight.Server != "" || insight.CDNWAF != "" || insight.CMS != "" || insight.Protocol != "" || insight.SPA != "" || insight.PWA != "" || insight.ContentSecurityPolicy != "" || insight.XFrameOptions != "" || insight.StrictTransportSecurity != "" || insight.AccessControlAllowOrigin != "" || len(insight.CookieSecurity) > 0 || len(insight.JWTIndicators) > 0 || len(insight.APISpecs) > 0 || insight.GraphQLIntrospection != "") {
 				hasOutput = true
 			}
 			if showRoutes && len(insight.Routes) > 0 {
@@ -115,19 +120,19 @@ func main() {
 			if !hasOutput {
 				fmt.Println("- No technology insights detected.")
 			}
-			fmt.Println(strings.Repeat("-", 80))
+			fmt.Println(strings.Repeat("-", 68))
 			return
 		}
 
 		fmt.Println("\n🛰️  Surisc Completed. Results:")
-		fmt.Println(strings.Repeat("-", 80))
+		fmt.Println(strings.Repeat("-", 68))
 		if len(leaks) == 0 {
 			fmt.Println("No leaks detected or target could not be reached.")
 		}
 		for _, leak := range leaks {
 			fmt.Printf("[!]\t[%s]\n\t[SOURCE_URL]: %s\n\t[GRAVITY_SCORE]: %.2f\n\t[SNIPPET]: %s\n",
 				leak.LeakType, leak.SourceURL, leak.GravityScore, leak.Snippet)
-			fmt.Println(strings.Repeat("-", 80))
+			fmt.Println(strings.Repeat("-", 68))
 		}
 	}
 }
@@ -176,22 +181,40 @@ func parseInformativeArgs(args []string) ([]string, bool, string, error) {
 }
 
 func printInfoTable(rows [][2]string) {
-	fmt.Println(strings.Repeat("-", 80))
-	fmt.Printf("| %-16s | %-57s |\n", "Field", "Value")
-	fmt.Printf("|%s|%s|\n", strings.Repeat("-", 18), strings.Repeat("-", 59))
+	w := terminalWidth()
+	if w < 60 {
+		// Fallback to simple list for very narrow terminals
+		for _, row := range rows {
+			val := row[1]
+			if val == "" {
+				val = "-"
+			}
+			fmt.Printf("  %s: %s\n", row[0], val)
+		}
+		return
+	}
+	// 68-char table fits comfortably even in narrower terminals
+	fmt.Println(strings.Repeat("-", 68))
+	fmt.Printf("  %-16s  %-45s\n", "Field", "Value")
+	fmt.Printf("  %s  %s\n", strings.Repeat("-", 16), strings.Repeat("-", 45))
 	for _, row := range rows {
 		val := row[1]
 		if val == "" {
 			val = "-"
 		}
-		fmt.Printf("| %-16s | %-57s |\n", row[0], truncateLine(val, 57))
+		fmt.Printf("  %-16s  %-45s\n", row[0], truncateLine(val, 45))
 	}
-	fmt.Println(strings.Repeat("-", 80))
+	fmt.Println(strings.Repeat("-", 68))
+}
+
+func terminalWidth() int {
+	// Default to a safe 68-char width; no platform-specific ioctl calls.
+	return 68
 }
 
 func printListSection(title string, items []string) {
 	fmt.Printf("\n[%s]\n", title)
-	fmt.Println(strings.Repeat("-", 80))
+	fmt.Println(strings.Repeat("-", 68))
 	for _, item := range items {
 		fmt.Printf("- %s\n", item)
 	}
@@ -199,11 +222,11 @@ func printListSection(title string, items []string) {
 
 func printTwoColumnTable(title, colA, colB string, rows [][2]string) {
 	fmt.Printf("\n[%s]\n", title)
-	fmt.Println(strings.Repeat("-", 80))
-	fmt.Printf("| %-20s | %-54s |\n", colA, colB)
-	fmt.Printf("|%s|%s|\n", strings.Repeat("-", 22), strings.Repeat("-", 56))
+	fmt.Println(strings.Repeat("-", 68))
+	fmt.Printf("  %-16s  %-45s\n", colA, colB)
+	fmt.Printf("  %s  %s\n", strings.Repeat("-", 16), strings.Repeat("-", 45))
 	for _, row := range rows {
-		fmt.Printf("| %-20s | %-54s |\n", truncateLine(row[0], 20), truncateLine(row[1], 54))
+		fmt.Printf("  %-16s  %-45s\n", truncateLine(row[0], 16), truncateLine(row[1], 45))
 	}
 }
 
@@ -254,6 +277,13 @@ func printSitemapTable(content string) {
 		rows = append(rows, [2]string{"-", "No <loc> entries parsed"})
 	}
 	printTwoColumnTable("sitemap.xml", "#", "Location", rows)
+}
+
+func orDefault(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
 }
 
 func truncateLine(s string, max int) string {
