@@ -1,0 +1,21 @@
+contributors: true
+exclude: []
+github:
+    upload: false
+group_unknown: true
+include:
+    - feat
+    - fix
+    - perf
+    - docs
+    - refactor
+    - style
+    - build
+    - ci
+    - test
+    - chore
+    - revert
+output: docs/releases
+release_name: Version {{ .Version }}
+statistics: true
+template: default
