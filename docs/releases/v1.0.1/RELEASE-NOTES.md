@@ -1,45 +1,22 @@
 # Release Notes
 
-## Version
+## v1.0.1 — Pattern Expansion & Docker
 
-v1.0.1
+### Highlights
 
-## Release Date
+Expanded secret detection patterns with new credential types and added Docker support for containerized scanning.
 
-2026-07-13
+### What's New
 
-## Summary
+- **Docker support** — Official Docker image published to GitHub Container Registry (`ghcr.io/marcuwynu23/surisc`)
+- **Expanded secret detection** — Added patterns for additional credential types beyond the initial AWS/Stripe/GitHub set
+- **Improved test coverage** — Test cases for all supported secret patterns
 
-- 4 features
-- 5 documentation
-- 1 ci/cd
+### Documentation
 
----
+- Restructured README with clean pattern matching table and terminology section
+- Added CHANGELOG for version tracking
 
-## Features
+### CI/CD
 
-- Introduce initial web scanner for secret detection using regex patterns, defining leak models, and updating README.
-- Add scanner test cases for multiple secret types and correct README example output.
-- Implement a web content scanner for secret detection, including new models and tests.
-- Added Dockerfile
-
-## Documentation
-
-- Refactor the pattern matching list into a table and add a new terminology section to the README.
-- Updated README.md
-- Updated README.md
-- Updated README.md
-- Add CHANGELOG.md
-
-## CI/CD
-
-- Added package-container workflow for publishing dockerfile to github package
-
-## Contributors
-
-- Mark Wayne Menorca (10 commits)
-
-## Full Changelog
-
-v1.0.0...v1.0.1
-
+- Automated Docker image builds and publishing to GitHub Packages
