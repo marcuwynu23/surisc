@@ -1,42 +1,22 @@
 # Release Notes
 
-## Version
+## v2.1.0 — PWA Detection & SPA Filtering
 
-v2.1.0
+### Highlights
 
-## Release Date
+Added progressive web app (PWA) detection, improved script source handling, and smarter SPA fallback filtering for more accurate route discovery.
 
-2026-07-13
+### What's New
 
-## Summary
+- **PWA detection** — Classifies targets as PWA (manifest + service worker), Likely (one present), or No (none found)
+- **Smart script handling** — Improved external vs. inline script source detection
+- **SPA fallback filtering** — Attack surface probing now filters out SPA 200 HTML fallback responses, revealing only real endpoints
 
-- 4 features
-- 2 bug fixes
-- 1 maintenance
+### Bug Fixes
 
----
+- Fixed informative scope detection for more accurate technology profiling
+- Improved HTML fallback detection for `robots.txt` and `sitemap.xml` — no longer misidentifies SPA HTML responses as valid files
 
-## Features
+### Documentation
 
-- Enhance script source handling in scanner
-- Add PWA detection to scanning insights
-- Enhance attack surface probing with improved response handling
-- Expand informative security posture checks in README
-
-## Bug Fixes
-
-- Update informative scope and enhance tech detection in scanner
-- Improve HTML fallback detection in robots.txt and sitemap.xml handling
-
-## Maintenance
-
-- Update CHANGELOG for version 2.0.0
-
-## Contributors
-
-- Mark Wayne Menorca (7 commits)
-
-## Full Changelog
-
-v2.0.0...v2.1.0
-
+- Expanded informative security posture section in README with use-case examples

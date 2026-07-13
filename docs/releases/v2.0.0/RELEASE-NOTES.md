@@ -1,36 +1,16 @@
 # Release Notes
 
-## Version
+## v2.0.0 — Security Profiling
 
-v2.0.0
+### Highlights
 
-## Release Date
+Major update introducing comprehensive target security profiling. SuriSC now profiles not just secrets but the entire security posture of a target.
 
-2026-07-13
+### What's New
 
-## Summary
-
-- 4 features
-- 1 refactoring
-
----
-
-## Features
-
-- Enhance attack surface probing in scanner
-- Improve handling of robots.txt and sitemap.xml in scanner
-- Enhance scanning capabilities for cookie security and JWT indicators
-- Enhance security headers detection in scanner
-
-## Refactoring
-
-- Fine tune scanning and false positive
-
-## Contributors
-
-- Mark Wayne Menorca (9 commits)
-
-## Full Changelog
-
-v1.1.6...v2.0.0
-
+- **Attack surface probing** — Probes common sensitive paths (`/admin`, `/api`, `/auth`, `/dashboard`, `/graphql`) and reports reachable endpoints
+- **robots.txt & sitemap.xml analysis** — Fetches and parses `robots.txt` directives and `sitemap.xml` URLs for route discovery
+- **Cookie security audit** — Inspects cookies for `HttpOnly`, `Secure`, and `SameSite` flags
+- **JWT detection** — Identifies JWT-like tokens from cookie names and values
+- **Security headers audit** — Checks for CSP, X-Frame-Options, HSTS, and CORS headers
+- **False positive tuning** — Improved filtering to reduce noise in scan results
