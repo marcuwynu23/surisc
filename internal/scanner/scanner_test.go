@@ -1177,3 +1177,418 @@ func TestAnalyzeContent_FiltersPlaceholderSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestAnalyzeCSP_Table(t *testing.T) {
+	tests := []struct {
+		name    string
+		csp     string
+		want    []string
+		wantCnt int
+	}{
+		{"missing header", "", []string{"missing"}, 1},
+		{"unsafe-inline in script-src", "default-src 'self'; script-src 'unsafe-inline' 'self'", []string{"unsafe-inline"}, 2},
+		{"unsafe-inline in default-src", "default-src 'unsafe-inline' 'self'", []string{"unsafe-inline"}, 2},
+		{"unsafe-eval in script-src", "default-src 'self'; script-src 'unsafe-eval'", []string{"unsafe-eval"}, 2},
+		{"unsafe-inline + unsafe-eval combo", "default-src 'self'; script-src 'unsafe-inline' 'unsafe-eval'", []string{"unsafe-inline", "unsafe-eval"}, 2},
+		{"missing object-src", "default-src 'self'; script-src 'self'", []string{"object-src"}, 1},
+		{"case insensitive unsafe-inline", "default-src 'self'; Script-Src 'Unsafe-Inline'", []string{"unsafe-inline"}, 2},
+		{"strict-dynamic still missing object-src", "script-src 'strict-dynamic' 'self'", []string{"object-src"}, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var localLeaks []models.Leak
+			h := http.Header{}
+			if tt.csp != "" {
+				h.Set("Content-Security-Policy", tt.csp)
+			}
+			analyzeCSP(h, "https://example.com", &localLeaks)
+			if len(localLeaks) < tt.wantCnt {
+				t.Fatalf("expected >= %d CSP leaks, got %d", tt.wantCnt, len(localLeaks))
+			}
+			for _, want := range tt.want {
+				found := false
+				for _, l := range localLeaks {
+					if l.LeakType == models.LeakTypeWeakCSP && strings.Contains(l.Snippet, want) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected CSP leak snippet containing %q (found %d leaks)", want, len(localLeaks))
+				}
+			}
+		})
+	}
+}
+
+func TestAnalyzeCSP_Secure(t *testing.T) {
+	securePolicies := []struct {
+		name string
+		csp  string
+	}{
+		{"default-none + explicit object-src", "default-src 'none'; script-src 'self'; object-src 'none'; base-uri 'none'"},
+		{"no unsafe-* directives", "default-src 'self'; script-src 'self'; object-src 'self'"},
+		{"nonce-based CSP with object-src", "default-src 'self'; script-src 'nonce-abc123' 'strict-dynamic'; object-src 'self'"},
+	}
+	for _, tt := range securePolicies {
+		t.Run(tt.name, func(t *testing.T) {
+			var localLeaks []models.Leak
+			h := http.Header{}
+			h.Set("Content-Security-Policy", tt.csp)
+			analyzeCSP(h, "https://example.com", &localLeaks)
+			for _, l := range localLeaks {
+				if l.LeakType == models.LeakTypeWeakCSP {
+					t.Fatalf("unexpected CSP leak for secure policy %q: %s", tt.name, l.Snippet)
+				}
+			}
+		})
+	}
+}
+
+func TestAnalyzeCORS_Table(t *testing.T) {
+	tests := []struct {
+		name         string
+		origin       string
+		creds        string
+		wantLeak     bool
+		wantCredHint bool
+	}{
+		{"wildcard with credentials true", "*", "true", true, true},
+		{"wildcard with credentials false", "*", "false", true, false},
+		{"wildcard no credentials header", "*", "", true, false},
+		{"specific origin with credentials", "https://trusted.com", "true", false, false},
+		{"specific origin without credentials", "https://trusted.com", "", false, false},
+		{"no ACAO header", "", "", false, false},
+		{"no ACAO with credentials header only", "", "true", false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var localLeaks []models.Leak
+			h := http.Header{}
+			if tt.origin != "" {
+				h.Set("Access-Control-Allow-Origin", tt.origin)
+			}
+			if tt.creds != "" {
+				h.Set("Access-Control-Allow-Credentials", tt.creds)
+			}
+			analyzeCORS(h, "https://example.com", &localLeaks)
+			hasLeak := false
+			hasCredHint := false
+			for _, l := range localLeaks {
+				if l.LeakType == models.LeakTypeCORMisconfig {
+					hasLeak = true
+					if strings.Contains(l.Snippet, "Allow-Credentials") {
+						hasCredHint = true
+					}
+				}
+			}
+			if hasLeak != tt.wantLeak {
+				t.Errorf("expected leak=%v, got leak=%v", tt.wantLeak, hasLeak)
+			}
+			if hasCredHint != tt.wantCredHint {
+				t.Errorf("expected credential hint=%v, got=%v", tt.wantCredHint, hasCredHint)
+			}
+		})
+	}
+}
+
+func TestAnalyzeCookieSecurity_Table(t *testing.T) {
+	tests := []struct {
+		name    string
+		cookies []string
+		wantMin int
+		wantNil bool
+	}{
+		{"bare cookie no flags", []string{"session=abc123; Path=/"}, 2, false},
+		{"all flags present", []string{"session=abc123; Path=/; HttpOnly; Secure; SameSite=Lax"}, 0, true},
+		{"multiple cookies some insecure", []string{"session=abc123; Path=/; HttpOnly; Secure; SameSite=Lax", "tracking=xyz; Path=/"}, 2, false},
+		{"HttpOnly without Secure", []string{"session=abc123; Path=/; HttpOnly"}, 1, false},
+		{"Secure without HttpOnly", []string{"session=abc123; Path=/; Secure"}, 1, false},
+		{"SameSite=None with missing HttpOnly and Secure", []string{"session=abc123; Path=/; SameSite=None"}, 2, false},
+		{"SameSite=Strict with all flags", []string{"session=abc123; Path=/; HttpOnly; Secure; SameSite=Strict"}, 0, true},
+		{"empty set-cookie value", []string{""}, 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var localLeaks []models.Leak
+			h := http.Header{}
+			for _, c := range tt.cookies {
+				h.Add("Set-Cookie", c)
+			}
+			analyzeCookieSecurity(h, "https://example.com", &localLeaks)
+			if tt.wantNil {
+				for _, l := range localLeaks {
+					if l.LeakType == models.LeakTypeCookieHardening {
+						t.Fatalf("unexpected cookie hardening leak: %s", l.Snippet)
+					}
+				}
+			} else if len(localLeaks) < tt.wantMin {
+				t.Fatalf("expected >= %d cookie hardening leaks, got %d", tt.wantMin, len(localLeaks))
+			}
+		})
+	}
+}
+
+func TestAnalyzeSRI_Table(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		wantCnt int
+	}{
+		{"script without integrity", `<script src="https://cdn.example.com/app.js"></script>`, 1},
+		{"link stylesheet without integrity", `<link rel="stylesheet" href="https://cdn.example.com/style.css">`, 1},
+		{"both script and link without integrity", `<script src="https://cdn.example.com/app.js"></script><link rel="stylesheet" href="https://cdn.example.com/style.css">`, 2},
+		{"script with integrity present", `<script src="https://cdn.example.com/app.js" integrity="sha384-abc123"></script>`, 0},
+		{"link with integrity present", `<link rel="stylesheet" href="https://cdn.example.com/style.css" integrity="sha384-def456">`, 0},
+		{"mixed some with some without integrity", `<script src="https://cdn.example.com/secure.js" integrity="sha384-abc"></script><script src="https://cdn.example.com/no-integrity.js"></script>`, 1},
+		{"inline script no src", `<script>alert(1)</script>`, 0},
+		{"empty src attribute", `<script src=""></script>`, 0},
+		{"self-closing script tag", `<script src="https://cdn.example.com/app.js"/>`, 1},
+		{"same-origin script without integrity", `<script src="/js/app.js"></script>`, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var localLeaks []models.Leak
+			analyzeMissingSRI(tt.body, "https://example.com", &localLeaks)
+			cnt := 0
+			for _, l := range localLeaks {
+				if l.LeakType == models.LeakTypeMissingSRI {
+					cnt++
+				}
+			}
+			if cnt != tt.wantCnt {
+				t.Errorf("expected %d SRI leaks, got %d", tt.wantCnt, cnt)
+			}
+		})
+	}
+}
+
+func TestAnalyzeXSSSinks_Table(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		wantCnt int
+	}{
+		{"innerHTML assignment", `el.innerHTML = userInput;`, 1},
+		{"outerHTML assignment", `el.outerHTML = "<div>" + data + "</div>";`, 1},
+		{"eval call", `eval(code);`, 1},
+		{"document.write", `document.write(html);`, 1},
+		{"document.open", `document.open();`, 1},
+		{"insertAdjacentHTML", `el.insertAdjacentHTML('beforeend', html);`, 1},
+		{"multiple different sinks", `a.innerHTML = x; eval(code); document.write(html);`, 3},
+		{"case insensitive innerHtml", `el.innerHtml = data;`, 1},
+		{"clean textContent - no leak", `el.textContent = userInput;`, 0},
+		{"clean innerText - no leak", `el.innerText = userInput;`, 0},
+		{"clean setAttribute - no leak", `el.setAttribute("data-name", value);`, 0},
+		{"no sinks at all", `function add(a, b) { return a + b; }`, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var localLeaks []models.Leak
+			analyzeXSSSinks(tt.body, "https://example.com", &localLeaks)
+			cnt := 0
+			for _, l := range localLeaks {
+				if l.LeakType == models.LeakTypeXSSSink {
+					cnt++
+				}
+			}
+			if cnt != tt.wantCnt {
+				t.Errorf("expected %d XSS sink leaks, got %d", tt.wantCnt, cnt)
+			}
+		})
+	}
+}
+
+func TestAnalyzeOpenRedirect_Table(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		wantCnt int
+	}{
+		{"window.location = params.redirect", `window.location = params.redirect;`, 1},
+		{"window.location.href from params.url", `window.location.href = params.url;`, 1},
+		{"window.location.href from query.next", `window.location.href = query.next;`, 1},
+		{"variable named redirect used in assignment", `var url = getParam("redirect"); window.location = url;`, 1},
+		{"hardcoded string var - no leak", `window.location.href = "/dashboard";`, 0},
+		{"hardcoded absolute - no leak", `window.location.href = "https://trusted.com/page";`, 0},
+		{"window.location.reload - no leak", `window.location.reload();`, 0},
+		{"case insensitive Location", `window.LOCATION = params.redirect;`, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var localLeaks []models.Leak
+			analyzeOpenRedirect(tt.body, "https://example.com", &localLeaks)
+			cnt := 0
+			for _, l := range localLeaks {
+				if l.LeakType == models.LeakTypeOpenRedirect {
+					cnt++
+				}
+			}
+			if cnt != tt.wantCnt {
+				t.Errorf("expected %d open redirect leaks, got %d", tt.wantCnt, cnt)
+			}
+		})
+	}
+}
+
+func TestAnalyzeInsecureForms_Table(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		wantCnt int
+	}{
+		{"http form action", `<form action="http://example.com/login" method="POST">`, 1},
+		{"https form action - no leak", `<form action="https://example.com/login" method="POST">`, 0},
+		{"empty action - no leak", `<form action="">`, 0},
+		{"no action attribute - no leak", `<form method="POST">`, 0},
+		{"protocol-relative action - no leak", `<form action="//example.com/login">`, 0},
+		{"multiple forms one insecure", `<form action="https://example.com/login"></form><form action="http://evil.com/login"></form>`, 1},
+		{"uppercase HTTP", `<form action="HTTP://example.com/login">`, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var localLeaks []models.Leak
+			analyzeInsecureForms(tt.body, "https://example.com", &localLeaks)
+			cnt := 0
+			for _, l := range localLeaks {
+				if l.LeakType == models.LeakTypeInsecureForm {
+					cnt++
+				}
+			}
+			if cnt != tt.wantCnt {
+				t.Errorf("expected %d insecure form leaks, got %d", tt.wantCnt, cnt)
+			}
+		})
+	}
+}
+
+func TestAnalyzeVulnerableCDN_Table(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		want    string
+		wantCnt int
+	}{
+		{"jQuery via cdnjs", `<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script>`, "jQuery", 1},
+		{"Angular via cdnjs", `<script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.2/angular.min.js"></script>`, "Angular", 1},
+		{"React via unpkg", `<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>`, "React", 1},
+		{"Vue via cdn.jsdelivr", `<script src="https://cdn.jsdelivr.net/npm/vue@2.7.14/dist/vue.min.js"></script>`, "Vue", 1},
+		{"Bootstrap via maxcdn", `<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">`, "Bootstrap", 1},
+		{"Lodash via cdnjs", `<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>`, "Lodash", 1},
+		{"multiple known libs", `<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>`, "jQuery|Lodash", 2},
+		{"local script - no leak", `<script src="/js/app.js"></script>`, "", 0},
+		{"unknown CDN host - no leak", `<script src="https://mycdn.example.com/jquery/3.0.0/jquery.min.js"></script>`, "", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var localLeaks []models.Leak
+			analyzeVulnerableCDN(tt.body, "https://example.com", &localLeaks)
+			cnt := 0
+			for _, l := range localLeaks {
+				if l.LeakType == models.LeakTypeVulnCDN {
+					cnt++
+				}
+			}
+			if cnt != tt.wantCnt {
+				t.Errorf("expected %d vulnerable CDN leaks, got %d", tt.wantCnt, cnt)
+			}
+		})
+	}
+}
+
+func TestAnalyzeFrontendSecurity_Integration(t *testing.T) {
+	var leaks []models.Leak
+	var mu sync.Mutex
+
+	headers := http.Header{}
+	headers.Set("Content-Type", "text/html")
+	headers.Set("Set-Cookie", "session=abc123; Path=/")
+	headers.Set("Access-Control-Allow-Origin", "*")
+
+	body := []byte(`<html>
+<head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script>
+</head>
+<body>
+<form action="http://example.com/login" method="POST"></form>
+<script>document.getElementById("x").innerHTML = userInput;</script>
+</body>
+</html>`)
+
+	analyzeFrontendSecurity("https://example.com", headers, body, &leaks, &mu)
+
+	if len(leaks) == 0 {
+		t.Fatal("expected at least one frontend security leak")
+	}
+
+	types := map[models.LeakType]bool{}
+	for _, l := range leaks {
+		types[l.LeakType] = true
+	}
+
+	expectTypes := []models.LeakType{
+		models.LeakTypeWeakCSP,
+		models.LeakTypeCORMisconfig,
+		models.LeakTypeCookieHardening,
+		models.LeakTypeMissingSRI,
+		models.LeakTypeXSSSink,
+		models.LeakTypeInsecureForm,
+		models.LeakTypeVulnCDN,
+	}
+	for _, et := range expectTypes {
+		if !types[et] {
+			t.Errorf("expected frontend leak type %q not found", et)
+		}
+	}
+}
+
+func TestAnalyzeFrontendSecurity_JSContent(t *testing.T) {
+	var leaks []models.Leak
+	var mu sync.Mutex
+
+	headers := http.Header{}
+	headers.Set("Content-Type", "application/javascript")
+
+	body := []byte(`function processData(input) {
+	eval(input);
+	document.getElementById("output").innerHTML = input;
+}`)
+
+	analyzeFrontendSecurity("https://example.com/app.js", headers, body, &leaks, &mu)
+
+	foundXSS := false
+	foundRedirect := false
+	for _, l := range leaks {
+		switch l.LeakType {
+		case models.LeakTypeXSSSink:
+			foundXSS = true
+		case models.LeakTypeOpenRedirect:
+			foundRedirect = true
+		}
+	}
+	if !foundXSS {
+		t.Error("expected XSS sink leak in JS content")
+	}
+	if foundRedirect {
+		t.Error("expected no open redirect leak in input-to-innerHTML code")
+	}
+}
+
+func TestAnalyzeFrontendSecurity_NoFrontendLeaksForAPI(t *testing.T) {
+	var leaks []models.Leak
+	var mu sync.Mutex
+
+	headers := http.Header{}
+	headers.Set("Content-Type", "application/json")
+	headers.Set("Access-Control-Allow-Origin", "https://specific-client.com")
+	headers.Set("Set-Cookie", "session=abc123; Path=/; HttpOnly; Secure; SameSite=Strict")
+	headers.Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; object-src 'none'")
+
+	body := []byte(`{"status":"ok","data":{"id":1,"name":"test"}}`)
+
+	analyzeFrontendSecurity("https://example.com/api/users", headers, body, &leaks, &mu)
+
+	for _, l := range leaks {
+		t.Errorf("unexpected leak for secure API response: %s: %s", l.LeakType, l.Snippet)
+	}
+}

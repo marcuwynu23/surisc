@@ -26,6 +26,16 @@ const (
 	LeakTypeRSAPrivate     LeakType = "RSA_PRIVATE_KEY"
 	LeakTypeFirebaseConfig LeakType = "FIREBASE_CONFIG_LEAK"
 	LeakTypeSupabaseConfig LeakType = "SUPABASE_CONFIG_LEAK"
+
+	// Frontend security findings
+	LeakTypeWeakCSP       LeakType = "WEAK_CSP"
+	LeakTypeCORMisconfig  LeakType = "CORS_MISCONFIG"
+	LeakTypeCookieHardening LeakType = "COOKIE_HARDENING"
+	LeakTypeMissingSRI    LeakType = "MISSING_SRI"
+	LeakTypeXSSSink       LeakType = "XSS_SINK"
+	LeakTypeOpenRedirect  LeakType = "OPEN_REDIRECT"
+	LeakTypeInsecureForm  LeakType = "INSECURE_FORM"
+	LeakTypeVulnCDN       LeakType = "VULNERABLE_CDN_LIBRARY"
 )
 
 type Leak struct {

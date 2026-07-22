@@ -372,6 +372,17 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 				analyzeContent(r.Request.URL.String(), content, &leaks, &leaksMutex)
 			}()
 		}
+
+		// Frontend security analysis (headers + body)
+		if !informativeOnly {
+			bodyCopy := make([]byte, len(r.Body))
+			copy(bodyCopy, r.Body)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				analyzeFrontendSecurity(r.Request.URL.String(), *r.Headers, bodyCopy, &leaks, &leaksMutex)
+			}()
+		}
 	})
 
 	// Setup error handling
@@ -1222,6 +1233,18 @@ func isCrawlableResourceRef(raw string) bool {
 }
 
 var rxAPIKeyHeader = regexp.MustCompile(`(?i)(?:api[_-]?key|api[_-]?token|auth[_-]?token|x[_-]?api[_-]?key|x[_-]?auth[_-]?token)`)
+
+var rxScriptTag = regexp.MustCompile(`(?i)<script\s[^>]*src\s*=\s*["']([^"']+)["'][^>]*>`)
+var rxStyleLink = regexp.MustCompile(`(?i)<link\s[^>]*rel\s*=\s*["']stylesheet["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>`)
+var rxXSSSink = regexp.MustCompile(`(?i)(?:\.innerHTML\s*=|\.outerHTML\s*=|document\.write\s*\(|eval\s*\(|document\.open\s*\(|\.insertAdjacentHTML\s*\()`)
+var rxOpenRedirect = regexp.MustCompile(`(?i)(?:window\.)?location(?:\.href)?\s*=\s*.*?(?:params|query|search|url|redirect|next|return)`)
+var rxInsecureFormAction = regexp.MustCompile(`(?i)<form\s[^>]*action\s*=\s*["']http://[^"']+["']`)
+var rxCDNjQuery = regexp.MustCompile(`(?i)(?:cdnjs\.cloudflare|cdn\.jsdelivr|ajax\.googleapis|code\.jquery)\.(?:com|net).*jquery[-.\/@][0-9]+\.[0-9]+\.[0-9]+`)
+var rxCDNAngular = regexp.MustCompile(`(?i)(?:cdnjs\.cloudflare|cdn\.jsdelivr|ajax\.googleapis|unpkg)\.(?:com|net).*angular(?:\.js)?[-.\/@][0-9]+\.[0-9]+\.[0-9]+`)
+var rxCDNReact = regexp.MustCompile(`(?i)(?:cdnjs\.cloudflare|cdn\.jsdelivr|unpkg)\.(?:com|net).*react[-.\/@][0-9]+\.[0-9]+\.[0-9]+`)
+var rxCDNVue = regexp.MustCompile(`(?i)(?:cdnjs\.cloudflare|cdn\.jsdelivr|unpkg)\.(?:com|net).*vue[-.\/@][0-9]+\.[0-9]+\.[0-9]+`)
+var rxCDNBootstrap = regexp.MustCompile(`(?i)(?:cdnjs\.cloudflare|cdn\.jsdelivr|maxcdn|getbootstrap|bootstrapcdn)\.(?:com|net).*bootstrap[-.\/@][0-9]+\.[0-9]+\.[0-9]+`)
+var rxCDNLodash = regexp.MustCompile(`(?i)(?:cdnjs\.cloudflare|cdn\.jsdelivr|unpkg)\.(?:com|net).*lodash(?:\.js)?[-.\/@][0-9]+\.[0-9]+\.[0-9]+`)
 
 func analyzeHeaders(sourceURL string, headers *http.Header, leaks *[]models.Leak, mutex *sync.Mutex) {
 	var localLeaks []models.Leak
@@ -2227,6 +2250,219 @@ func mustParseURL(raw string) *url.URL {
 		return nil
 	}
 	return u
+}
+
+func analyzeFrontendSecurity(sourceURL string, headers http.Header, body []byte, leaks *[]models.Leak, mutex *sync.Mutex) {
+	var localLeaks []models.Leak
+
+	ctype := headers.Get("Content-Type")
+	bodyStr := string(body)
+
+	analyzeCSP(headers, sourceURL, &localLeaks)
+	analyzeCORS(headers, sourceURL, &localLeaks)
+	analyzeCookieSecurity(headers, sourceURL, &localLeaks)
+
+	if strings.Contains(ctype, "text/html") {
+		analyzeMissingSRI(bodyStr, sourceURL, &localLeaks)
+		analyzeInsecureForms(bodyStr, sourceURL, &localLeaks)
+		analyzeVulnerableCDN(bodyStr, sourceURL, &localLeaks)
+	}
+
+	if strings.Contains(ctype, "text/html") || strings.Contains(ctype, "javascript") {
+		analyzeXSSSinks(bodyStr, sourceURL, &localLeaks)
+		analyzeOpenRedirect(bodyStr, sourceURL, &localLeaks)
+	}
+
+	if len(localLeaks) > 0 {
+		localLeaks = dedupeLeaks(localLeaks)
+		mutex.Lock()
+		*leaks = append(*leaks, localLeaks...)
+		mutex.Unlock()
+	}
+}
+
+func analyzeCSP(headers http.Header, sourceURL string, localLeaks *[]models.Leak) {
+	csp := headers.Get("Content-Security-Policy")
+	if csp == "" {
+		*localLeaks = append(*localLeaks, models.Leak{
+			LeakType:     models.LeakTypeWeakCSP,
+			SourceURL:    sourceURL,
+			GravityScore: 5.0,
+			Snippet:      "Content-Security-Policy header is missing",
+		})
+		return
+	}
+	cspLower := strings.ToLower(csp)
+
+	if strings.Contains(cspLower, "unsafe-inline") {
+		*localLeaks = append(*localLeaks, models.Leak{
+			LeakType:     models.LeakTypeWeakCSP,
+			SourceURL:    sourceURL,
+			GravityScore: 7.0,
+			Snippet:      "CSP allows unsafe-inline: " + truncate(csp, 100),
+		})
+	}
+	if strings.Contains(cspLower, "unsafe-eval") {
+		*localLeaks = append(*localLeaks, models.Leak{
+			LeakType:     models.LeakTypeWeakCSP,
+			SourceURL:    sourceURL,
+			GravityScore: 6.5,
+			Snippet:      "CSP allows unsafe-eval: " + truncate(csp, 100),
+		})
+	}
+	if !strings.Contains(cspLower, "object-src") {
+		*localLeaks = append(*localLeaks, models.Leak{
+			LeakType:     models.LeakTypeWeakCSP,
+			SourceURL:    sourceURL,
+			GravityScore: 5.5,
+			Snippet:      "CSP missing object-src directive: " + truncate(csp, 100),
+		})
+	}
+}
+
+func analyzeCORS(headers http.Header, sourceURL string, localLeaks *[]models.Leak) {
+	origin := headers.Get("Access-Control-Allow-Origin")
+	creds := headers.Get("Access-Control-Allow-Credentials")
+
+	if origin == "*" && strings.EqualFold(creds, "true") {
+		*localLeaks = append(*localLeaks, models.Leak{
+			LeakType:     models.LeakTypeCORMisconfig,
+			SourceURL:    sourceURL,
+			GravityScore: 8.0,
+			Snippet:      "Access-Control-Allow-Origin: * with Allow-Credentials: true",
+		})
+	} else if origin == "*" {
+		*localLeaks = append(*localLeaks, models.Leak{
+			LeakType:     models.LeakTypeCORMisconfig,
+			SourceURL:    sourceURL,
+			GravityScore: 5.0,
+			Snippet:      "Access-Control-Allow-Origin: * (wildcard)",
+		})
+	}
+}
+
+func analyzeCookieSecurity(headers http.Header, sourceURL string, localLeaks *[]models.Leak) {
+	cookies := cookiesFromHeader(&headers)
+	for _, c := range cookies {
+		if c == nil {
+			continue
+		}
+		if !c.HttpOnly {
+			*localLeaks = append(*localLeaks, models.Leak{
+				LeakType:     models.LeakTypeCookieHardening,
+				SourceURL:    sourceURL,
+				GravityScore: 6.0,
+				Snippet:      fmt.Sprintf("Cookie %q missing HttpOnly flag", c.Name),
+			})
+		}
+		if !c.Secure {
+			*localLeaks = append(*localLeaks, models.Leak{
+				LeakType:     models.LeakTypeCookieHardening,
+				SourceURL:    sourceURL,
+				GravityScore: 5.5,
+				Snippet:      fmt.Sprintf("Cookie %q missing Secure flag", c.Name),
+			})
+		}
+		if c.SameSite == http.SameSiteDefaultMode {
+			*localLeaks = append(*localLeaks, models.Leak{
+				LeakType:     models.LeakTypeCookieHardening,
+				SourceURL:    sourceURL,
+				GravityScore: 4.0,
+				Snippet:      fmt.Sprintf("Cookie %q missing SameSite attribute", c.Name),
+			})
+		}
+	}
+}
+
+func analyzeMissingSRI(body, sourceURL string, localLeaks *[]models.Leak) {
+	for _, match := range rxScriptTag.FindAllStringSubmatch(body, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		fullTag := match[0]
+		src := match[1]
+		if !strings.Contains(fullTag, "integrity=") {
+			*localLeaks = append(*localLeaks, models.Leak{
+				LeakType:     models.LeakTypeMissingSRI,
+				SourceURL:    sourceURL,
+				GravityScore: 4.0,
+				Snippet:      fmt.Sprintf("Script without integrity attribute: %s", truncate(src, 80)),
+			})
+		}
+	}
+	for _, match := range rxStyleLink.FindAllStringSubmatch(body, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		fullTag := match[0]
+		href := match[1]
+		if !strings.Contains(fullTag, "integrity=") {
+			*localLeaks = append(*localLeaks, models.Leak{
+				LeakType:     models.LeakTypeMissingSRI,
+				SourceURL:    sourceURL,
+				GravityScore: 3.0,
+				Snippet:      fmt.Sprintf("Stylesheet without integrity attribute: %s", truncate(href, 80)),
+			})
+		}
+	}
+}
+
+func analyzeXSSSinks(body, sourceURL string, localLeaks *[]models.Leak) {
+	for _, match := range rxXSSSink.FindAllString(body, -1) {
+		*localLeaks = append(*localLeaks, models.Leak{
+			LeakType:     models.LeakTypeXSSSink,
+			SourceURL:    sourceURL,
+			GravityScore: 8.0,
+			Snippet:      fmt.Sprintf("XSS sink detected: %s", truncate(strings.TrimSpace(match), 60)),
+		})
+	}
+}
+
+func analyzeOpenRedirect(body, sourceURL string, localLeaks *[]models.Leak) {
+	for _, match := range rxOpenRedirect.FindAllString(body, -1) {
+		*localLeaks = append(*localLeaks, models.Leak{
+			LeakType:     models.LeakTypeOpenRedirect,
+			SourceURL:    sourceURL,
+			GravityScore: 7.0,
+			Snippet:      fmt.Sprintf("Potential open redirect: %s", truncate(strings.TrimSpace(match), 80)),
+		})
+	}
+}
+
+func analyzeInsecureForms(body, sourceURL string, localLeaks *[]models.Leak) {
+	for _, match := range rxInsecureFormAction.FindAllString(body, -1) {
+		*localLeaks = append(*localLeaks, models.Leak{
+			LeakType:     models.LeakTypeInsecureForm,
+			SourceURL:    sourceURL,
+			GravityScore: 6.0,
+			Snippet:      fmt.Sprintf("Insecure form action (HTTP): %s", truncate(strings.TrimSpace(match), 100)),
+		})
+	}
+}
+
+func analyzeVulnerableCDN(body, sourceURL string, localLeaks *[]models.Leak) {
+	checks := []struct {
+		rx    *regexp.Regexp
+		lib   string
+		score float64
+	}{
+		{rxCDNjQuery, "jQuery", 5.0},
+		{rxCDNAngular, "Angular", 4.5},
+		{rxCDNReact, "React", 4.0},
+		{rxCDNVue, "Vue", 4.0},
+		{rxCDNBootstrap, "Bootstrap", 4.0},
+		{rxCDNLodash, "Lodash", 4.0},
+	}
+	for _, check := range checks {
+		for _, match := range check.rx.FindAllString(body, -1) {
+			*localLeaks = append(*localLeaks, models.Leak{
+				LeakType:     models.LeakTypeVulnCDN,
+				SourceURL:    sourceURL,
+				GravityScore: check.score,
+				Snippet:      fmt.Sprintf("Known %s CDN dependency (check version for known CVEs): %s", check.lib, truncate(match, 80)),
+			})
+		}
+	}
 }
 
 func applyBrowserHeaders(req *http.Request) {

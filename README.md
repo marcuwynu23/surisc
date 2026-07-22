@@ -39,11 +39,11 @@ The name combines **suri** (Tagalog: "examine" or "analyze") with **SC** for **s
 ### What It Does
 
 - **Scrapes** — Discovers every `<script>` tag on a page and fetches its payload without writing files to disk
-- **Detects** — 25+ secret types including AWS keys, Stripe secrets, GitHub PATs, Google API keys, Firebase/Supabase configs, and more
+- **Detects** — 30+ secret types including AWS keys, Stripe secrets, GitHub PATs, Google API keys, Firebase/Supabase configs, and more
 - **Scans response headers** — Checks every HTTP response header for API keys, bearer tokens, and credentials (x-api-key, Authorization, etc.)
 - **Ingests** — Fetches source map (`.map`) files and recursively scans their original source code for secrets
 - **Analyzes** — Shannon entropy scoring flags high-density strings that look like real credentials
-- **Profiles** — Identifies technology stack, hosting provider, CDN, CMS, SPA/PWA status, and security headers
+- **Audits frontend security** — Detects weak Content-Security-Policy, permissive CORS, missing HttpOnly/Secure/SameSite cookies, scripts without Subresource Integrity, XSS sinks (innerHTML, eval, document.write), open redirects, insecure HTTP forms, and known vulnerable CDN library versions
 - **Discovers** — Routes from HTML, JS, JSON, `robots.txt`, and `sitemap.xml`; probes attack-surface paths
 - **Probes** — Detects GraphQL introspection endpoints, OpenAPI/Swagger spec files, and API documentation pages
 - **Filters** — Built-in false positive suppression ignores compilation artifacts, placeholder values, and standard library internals
