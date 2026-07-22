@@ -338,6 +338,8 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		mergeCookieInsights(cookiesFromHeader(r.Headers), &insight)
 		insightMutex.Unlock()
 
+		analyzeHeaders(r.Request.URL.String(), r.Headers, &leaks, &leaksMutex)
+
 		ctype := r.Headers.Get("Content-Type")
 		// Fingerprint frontend technologies from URL + content.
 		if r.Request != nil && r.Request.URL != nil {
@@ -1216,6 +1218,103 @@ func isCrawlableResourceRef(raw string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+var rxAPIKeyHeader = regexp.MustCompile(`(?i)(?:api[_-]?key|api[_-]?token|auth[_-]?token|x[_-]?api[_-]?key|x[_-]?auth[_-]?token)`)
+
+func analyzeHeaders(sourceURL string, headers *http.Header, leaks *[]models.Leak, mutex *sync.Mutex) {
+	var localLeaks []models.Leak
+	for k, vals := range *headers {
+		for _, v := range vals {
+			if v == "" {
+				continue
+			}
+			// Flag high-entropy values under known API key header names
+			if rxAPIKeyHeader.MatchString(k) && shannonEntropy(v) > 3.0 {
+				localLeaks = append(localLeaks, models.Leak{
+					LeakType:     models.LeakTypeGenericSec,
+					SourceURL:    sourceURL,
+					GravityScore: 8.5,
+					Snippet:      fmt.Sprintf("%s: %s", k, truncate(v, 50)),
+				})
+				continue
+			}
+			// Run content regex patterns against header values
+			if matches := rxGoogleKey.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeGoogleKey, SourceURL: sourceURL, GravityScore: 9.0, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxAWSKey.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeAWSKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxStripeKey.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeStripeKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxGitHubToken.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeGitHubToken, SourceURL: sourceURL, GravityScore: 10.0, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxSlackToken.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeSlackToken, SourceURL: sourceURL, GravityScore: 9.5, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxGitLabToken.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeGitLabToken, SourceURL: sourceURL, GravityScore: 10.0, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxSendGridKey.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeSendGridKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxMailgunKey.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeMailgunKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxResendKey.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeResendKey, SourceURL: sourceURL, GravityScore: 10.0, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxTwilioKey.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeTwilioKey, SourceURL: sourceURL, GravityScore: 9.5, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxSquareToken.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeSquareToken, SourceURL: sourceURL, GravityScore: 10.0, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+			if matches := rxBearerToken.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					token := string(m)
+					ent := shannonEntropy(token)
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeBearerToken, SourceURL: sourceURL, GravityScore: 7.0 + (ent * 0.5), Snippet: fmt.Sprintf("%s: %s", k, truncate(token, 50))})
+				}
+			}
+			if matches := rxInternalIP.FindAll([]byte(v), -1); len(matches) > 0 {
+				for _, m := range matches {
+					localLeaks = append(localLeaks, models.Leak{LeakType: models.LeakTypeInternalIP, SourceURL: sourceURL, GravityScore: 6.5, Snippet: fmt.Sprintf("%s: %s", k, m)})
+				}
+			}
+		}
+	}
+	if len(localLeaks) > 0 {
+		localLeaks = dedupeLeaks(localLeaks)
+		mutex.Lock()
+		*leaks = append(*leaks, localLeaks...)
+		mutex.Unlock()
 	}
 }
 

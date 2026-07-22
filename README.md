@@ -8,8 +8,8 @@
 ![Build Status](https://github.com/marcuwynu23/surisc/actions/workflows/release.yml/badge.svg)
 ![Downloads](https://img.shields.io/github/downloads/marcuwynu23/surisc/total)
 
-<strong>Frontend security reconnaissance from the browser's perspective.</strong>
-Proactively hunts leaked API keys, hardcoded credentials, and exposed environment variables in JavaScript bundles.
+<strong>DAST tool for frontend security reconnaissance.</strong>
+Proactively hunts leaked API keys, hardcoded credentials, and exposed environment variables by dynamically scanning live web applications — their HTML, JavaScript bundles, source maps, response headers, and API endpoints.
 
 [Read the full user guide →](USER-GUIDE.md)
 
@@ -32,14 +32,15 @@ Proactively hunts leaked API keys, hardcoded credentials, and exposed environmen
 
 ## What Is SuriSC?
 
-**SuriSC** (`/səˈrisk/`, _suh-REESK_) is a memory-resident reconnaissance tool built specifically for frontend web security. Written in Go, it scrapes, parses, and analyzes JavaScript bundles from target URLs to detect secrets that should never reach the browser.
+**SuriSC** (`/səˈrisk/`, _suh-REESK_) is a **DAST (Dynamic Application Security Testing)** reconnaissance tool built for frontend web security. Written in Go, it makes live HTTP requests to a running target, crawls pages, fetches JavaScript bundles, probes API endpoints, and scans response bodies and headers for secrets that should never reach the browser.
 
-The name combines **suri** (Tagalog: "examine" or "analyze") with **SC** for **scan** — a tool that examines frontends by scanning their JavaScript.
+The name combines **suri** (Tagalog: "examine" or "analyze") with **SC** for **scan** — a tool that dynamically scans live frontends.
 
 ### What It Does
 
 - **Scrapes** — Discovers every `<script>` tag on a page and fetches its payload without writing files to disk
 - **Detects** — 25+ secret types including AWS keys, Stripe secrets, GitHub PATs, Google API keys, Firebase/Supabase configs, and more
+- **Scans response headers** — Checks every HTTP response header for API keys, bearer tokens, and credentials (x-api-key, Authorization, etc.)
 - **Ingests** — Fetches source map (`.map`) files and recursively scans their original source code for secrets
 - **Analyzes** — Shannon entropy scoring flags high-density strings that look like real credentials
 - **Profiles** — Identifies technology stack, hosting provider, CDN, CMS, SPA/PWA status, and security headers
@@ -48,11 +49,18 @@ The name combines **suri** (Tagalog: "examine" or "analyze") with **SC** for **s
 - **Filters** — Built-in false positive suppression ignores compilation artifacts, placeholder values, and standard library internals
 - **Reports** — Human-readable HUD output and machine-readable JSON with gravity scores for triage
 
+### What It Does NOT Do
+
+- **Does not execute JavaScript** — surisc crawls and analyzes static JS source code but does not run a headless browser. Secrets that only appear in runtime fetch/XHR request headers (sent by JS after execution) are not captured
+- **Does not log in** — It scans what an unauthenticated visitor can access. Authenticated sessions or post-login endpoints require manual testing
+- **Does not scan source code repositories** — surisc targets live, deployed web applications, not git repos or offline codebases
+
 ### Why Use It?
 
 | Problem                                         | How SuriSC Solves It                                                               |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Accidental API key commits to public JS bundles | Scans every fetched script for 25+ credential patterns with gravity scoring        |
+| API keys leaked in response headers             | Scans every HTTP response header for credentials, bearer tokens, and internal IPs  |
 | `import.meta.env` leaks in Vite/CRA builds      | Detects `VITE_API_URL`, `SUPER_SECRET_TOKEN`, etc.                                 |
 | Source map exposure                             | Fetches `.map` files and recursively scans original source code for secrets        |
 | Firebase/Supabase configs in client bundles     | Detects `firebaseConfig` objects and `supabaseUrl`/`supabaseKey` assignments       |
@@ -315,7 +323,7 @@ surisc/
 
 - **Entrypoint** (`cmd/surisc/main.go`) — Parses CLI flags, validates the target URL, calls the scanner, and renders output
 - **Scraper** (`internal/scanner/scanner.go`) — Uses `colly/v2` with async goroutines to crawl HTML, fetch JS bundles, and extract routes
-- **Analyzer** — Scans content with 20+ compiled regex patterns and Shannon entropy calculations; deduplicates; assigns gravity scores
+- **Analyzer** — Scans response bodies and headers with 20+ compiled regex patterns and Shannon entropy calculations; deduplicates; assigns gravity scores
 - **Profiler** — Fingerprints frontend frameworks (React, Vue, Svelte, etc.), hosting providers (Vercel, Cloudflare, etc.), and security headers
 - **Models** (`internal/models/models.go`) — Go structs for `Leak` (finding) and `TechInsight` (profile) with JSON serialization tags
 - **Output** — HUD formatter (terminal tables) or JSON marshaler for pipeline use
