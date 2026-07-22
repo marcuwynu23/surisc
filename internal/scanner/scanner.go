@@ -103,6 +103,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	routeSet := make(map[string]struct{})
 	contentRouteSet := make(map[string]struct{})
 	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
 	baseTarget := mustParseURL(targetURL)
 	var wg sync.WaitGroup
 
@@ -345,7 +346,7 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 		if r.Request != nil && r.Request.URL != nil {
 			addTechFromURL(r.Request.URL.Path, techSet, &techMutex)
 		}
-		addTechFromBody(ctype, r.Body, techSet, &techMutex)
+		addTechFromBody(ctype, r.Body, techSet, stateMgrSet, &techMutex)
 
 		if strings.Contains(ctype, "text/html") && baseTarget != nil && r.Request.URL != nil && r.Request.URL.Host == baseTarget.Host {
 			classification := classifySPAFromHTML(r.Body)
@@ -416,6 +417,10 @@ func RunScan(targetURL string, informativeOnly bool) ([]models.Leak, models.Tech
 	if insight.Frontend == "" && strings.EqualFold(insight.CMS, "WordPress") {
 		insight.Frontend = "WordPress"
 	}
+	sm := sortedTech(stateMgrSet)
+	if len(sm) > 0 {
+		insight.StateManagement = strings.Join(sm, ", ")
+	}
 
 	return leaks, insight
 }
@@ -456,6 +461,15 @@ func ValidateTargetReachable(targetURL string) error {
 		return fmt.Errorf("target is not active: http status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func addStateMgr(name string, stateMgrSet map[string]struct{}, mu *sync.Mutex) {
+	if name == "" {
+		return
+	}
+	mu.Lock()
+	stateMgrSet[name] = struct{}{}
+	mu.Unlock()
 }
 
 func addTech(name string, techSet map[string]struct{}, mu *sync.Mutex) {
@@ -766,7 +780,7 @@ func addTechFromURL(path string, techSet map[string]struct{}, mu *sync.Mutex) {
 	}
 }
 
-func addTechFromBody(contentType string, body []byte, techSet map[string]struct{}, mu *sync.Mutex) {
+func addTechFromBody(contentType string, body []byte, techSet map[string]struct{}, stateMgrSet map[string]struct{}, mu *sync.Mutex) {
 	ct := strings.ToLower(contentType)
 	// Only scan likely text-like bodies.
 	if !(strings.Contains(ct, "html") || strings.Contains(ct, "javascript") || strings.Contains(ct, "json") || strings.Contains(ct, "text/")) {
@@ -829,6 +843,49 @@ func addTechFromBody(contentType string, body []byte, techSet map[string]struct{
 	}
 	if strings.Contains(s, "cdn.shopify.com") || strings.Contains(s, "shopify.theme") || strings.Contains(s, "shopify.shop") || strings.Contains(s, "window.shopify") || strings.Contains(s, "myshopify.com") || strings.Contains(s, "shopify-checkout-api-token") || strings.Contains(s, "x-shopify-stage") {
 		addTech("Shopify", techSet, mu)
+	}
+
+	// State management library detection.
+	if strings.Contains(s, `from "pinia"`) || strings.Contains(s, `from 'pinia'`) || strings.Contains(s, `require("pinia")`) || strings.Contains(s, `require('pinia')`) ||
+		strings.Contains(s, "definestore") {
+		addStateMgr("Pinia", stateMgrSet, mu)
+	}
+	if strings.Contains(s, `from "zustand"`) || strings.Contains(s, `from 'zustand'`) ||
+		strings.Contains(s, `require("zustand")`) || strings.Contains(s, `require('zustand')`) {
+		addStateMgr("Zustand", stateMgrSet, mu)
+	}
+	if strings.Contains(s, `from "redux"`) || strings.Contains(s, `from 'redux'`) ||
+		strings.Contains(s, `from "@reduxjs/toolkit"`) || strings.Contains(s, `from '@reduxjs/toolkit'`) ||
+		strings.Contains(s, `require("redux")`) || strings.Contains(s, `require('redux')`) ||
+		strings.Contains(s, "createstore") && strings.Contains(s, "reducer") ||
+		strings.Contains(s, "combinereducers") {
+		addStateMgr("Redux", stateMgrSet, mu)
+	}
+	if strings.Contains(s, `from "vuex"`) || strings.Contains(s, `from 'vuex'`) ||
+		strings.Contains(s, "createvuexstore") || strings.Contains(s, "createStore") && strings.Contains(s, "vuex") {
+		addStateMgr("Vuex", stateMgrSet, mu)
+	}
+	if strings.Contains(s, `from "recoil"`) || strings.Contains(s, `from 'recoil'`) ||
+		strings.Contains(s, "recoilroot") || strings.Contains(s, "userecoilstate") ||
+		strings.Contains(s, `from "jotai"`) || strings.Contains(s, `from 'jotai'`) ||
+		strings.Contains(s, "useatom") && strings.Contains(s, "jotai") {
+		addStateMgr("Jotai/Recoil", stateMgrSet, mu)
+	}
+	if strings.Contains(s, `from "mobx"`) || strings.Contains(s, `from 'mobx'`) ||
+		strings.Contains(s, `require("mobx")`) || strings.Contains(s, `require('mobx')`) ||
+		strings.Contains(s, "makeautoobservable") || strings.Contains(s, "mobx") && strings.Contains(s, "observable(") {
+		addStateMgr("MobX", stateMgrSet, mu)
+	}
+	if strings.Contains(s, `from "@tanstack/react-query"`) || strings.Contains(s, `from '@tanstack/react-query'`) ||
+		strings.Contains(s, "usequery") && strings.Contains(s, "queryclient") ||
+		strings.Contains(s, `from "swr"`) || strings.Contains(s, `from 'swr'`) ||
+		strings.Contains(s, "useswr") {
+		addStateMgr("TanStack Query / SWR", stateMgrSet, mu)
+	}
+	if strings.Contains(s, `from "valtio"`) || strings.Contains(s, `from 'valtio'`) ||
+		strings.Contains(s, `from "effector"`) || strings.Contains(s, `from 'effector'`) ||
+		strings.Contains(s, `require("valtio")`) || strings.Contains(s, `require('effector')`) {
+		addStateMgr("Valtio/Effector", stateMgrSet, mu)
 	}
 }
 
@@ -1233,6 +1290,9 @@ func isCrawlableResourceRef(raw string) bool {
 }
 
 var rxAPIKeyHeader = regexp.MustCompile(`(?i)(?:api[_-]?key|api[_-]?token|auth[_-]?token|x[_-]?api[_-]?key|x[_-]?auth[_-]?token)`)
+
+var rxStorageSetItem = regexp.MustCompile(`(?i)(?:localStorage|sessionStorage)\.setItem\s*\(\s*["']([^"']+)["']\s*,`)
+var rxStorageTokenValue = regexp.MustCompile(`(?i)(?:accessToken|refreshToken|jwt|session|auth|credentials?|apiKey|api_key|secret)\s*[=:]\s*["']([^"']+)["']`)
 
 var rxScriptTag = regexp.MustCompile(`(?i)<script\s[^>]*src\s*=\s*["']([^"']+)["'][^>]*>`)
 var rxStyleLink = regexp.MustCompile(`(?i)<link\s[^>]*rel\s*=\s*["']stylesheet["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>`)
@@ -2271,6 +2331,7 @@ func analyzeFrontendSecurity(sourceURL string, headers http.Header, body []byte,
 	if strings.Contains(ctype, "text/html") || strings.Contains(ctype, "javascript") {
 		analyzeXSSSinks(bodyStr, sourceURL, &localLeaks)
 		analyzeOpenRedirect(bodyStr, sourceURL, &localLeaks)
+		analyzeClientStorage(bodyStr, sourceURL, &localLeaks)
 	}
 
 	if len(localLeaks) > 0 {
@@ -2460,6 +2521,24 @@ func analyzeVulnerableCDN(body, sourceURL string, localLeaks *[]models.Leak) {
 				SourceURL:    sourceURL,
 				GravityScore: check.score,
 				Snippet:      fmt.Sprintf("Known %s CDN dependency (check version for known CVEs): %s", check.lib, truncate(match, 80)),
+			})
+		}
+	}
+}
+
+func analyzeClientStorage(body, sourceURL string, localLeaks *[]models.Leak) {
+	for _, match := range rxStorageSetItem.FindAllStringSubmatch(body, -1) {
+		key := match[1]
+		keyword := strings.ToLower(key)
+		if strings.Contains(keyword, "token") || strings.Contains(keyword, "jwt") ||
+			strings.Contains(keyword, "auth") || strings.Contains(keyword, "session") ||
+			strings.Contains(keyword, "credential") || strings.Contains(keyword, "secret") ||
+			strings.Contains(keyword, "apikey") || strings.Contains(keyword, "refresh") {
+			*localLeaks = append(*localLeaks, models.Leak{
+				LeakType:     models.LeakTypeStorageLeak,
+				SourceURL:    sourceURL,
+				GravityScore: 7.0,
+				Snippet:      fmt.Sprintf("Sensitive data stored in Web Storage: key=%q", truncate(key, 60)),
 			})
 		}
 	}

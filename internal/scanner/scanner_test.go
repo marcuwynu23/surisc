@@ -1592,3 +1592,228 @@ func TestAnalyzeFrontendSecurity_NoFrontendLeaksForAPI(t *testing.T) {
 		t.Errorf("unexpected leak for secure API response: %s: %s", l.LeakType, l.Snippet)
 	}
 }
+
+func TestAnalyzeClientStorage_DetectsTokenInLocalStorage(t *testing.T) {
+	var leaks []models.Leak
+	body := `localStorage.setItem("accessToken", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.dGVzdA");`
+	analyzeClientStorage(body, "https://example.com/app.js", &leaks)
+
+	found := false
+	for _, l := range leaks {
+		if l.LeakType == models.LeakTypeStorageLeak && l.SourceURL == "https://example.com/app.js" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected STORAGE_SENSITIVE_DATA leak for accessToken in localStorage")
+	}
+}
+
+func TestAnalyzeClientStorage_DetectsTokenInSessionStorage(t *testing.T) {
+	var leaks []models.Leak
+	body := `sessionStorage.setItem("jwt", "header.payload.sig");`
+	analyzeClientStorage(body, "https://example.com/app.js", &leaks)
+
+	found := false
+	for _, l := range leaks {
+		if l.LeakType == models.LeakTypeStorageLeak {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected STORAGE_SENSITIVE_DATA leak for jwt in sessionStorage")
+	}
+}
+
+func TestAnalyzeClientStorage_DetectsAuthToken(t *testing.T) {
+	var leaks []models.Leak
+	body := `localStorage.setItem("auth_token", "some-secret-value");`
+	analyzeClientStorage(body, "https://example.com/app.js", &leaks)
+
+	found := false
+	for _, l := range leaks {
+		if l.LeakType == models.LeakTypeStorageLeak {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected STORAGE_SENSITIVE_DATA leak for auth_token")
+	}
+}
+
+func TestAnalyzeClientStorage_DetectsRefreshToken(t *testing.T) {
+	var leaks []models.Leak
+	body := `localStorage.setItem("refreshToken", "some-refresh-value");`
+	analyzeClientStorage(body, "https://example.com/app.js", &leaks)
+
+	found := false
+	for _, l := range leaks {
+		if l.LeakType == models.LeakTypeStorageLeak {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected STORAGE_SENSITIVE_DATA leak for refreshToken")
+	}
+}
+
+func TestAnalyzeClientStorage_SkipsNonSensitiveKeys(t *testing.T) {
+	var leaks []models.Leak
+	body := `localStorage.setItem("theme", "dark");
+localStorage.setItem("language", "en");
+sessionStorage.setItem("cartItems", "3");`
+	analyzeClientStorage(body, "https://example.com/app.js", &leaks)
+
+	if len(leaks) > 0 {
+		t.Fatalf("expected no leaks for benign keys, got %d", len(leaks))
+	}
+}
+
+func TestAddStateMgr(t *testing.T) {
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	addStateMgr("Pinia", stateMgrSet, &mu)
+	if _, ok := stateMgrSet["Pinia"]; !ok {
+		t.Fatal("expected Pinia to be added")
+	}
+
+	addStateMgr("", stateMgrSet, &mu)
+	if len(stateMgrSet) != 1 {
+		t.Fatal("expected empty string to not add")
+	}
+}
+
+func TestAddTechFromBody_DetectsPinia(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`import { defineStore } from "pinia";`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if _, ok := stateMgrSet["Pinia"]; !ok {
+		t.Fatal("expected Pinia state management detected")
+	}
+}
+
+func TestAddTechFromBody_DetectsZustand(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`import { create } from "zustand";`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if _, ok := stateMgrSet["Zustand"]; !ok {
+		t.Fatal("expected Zustand state management detected")
+	}
+}
+
+func TestAddTechFromBody_DetectsRedux(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`import { configureStore } from "@reduxjs/toolkit";`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if _, ok := stateMgrSet["Redux"]; !ok {
+		t.Fatal("expected Redux state management detected")
+	}
+}
+
+func TestAddTechFromBody_DetectsVuex(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`import Vue from "vue"; import Vuex from "vuex"; createStore({})`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if _, ok := stateMgrSet["Vuex"]; !ok {
+		t.Fatal("expected Vuex state management detected")
+	}
+}
+
+func TestAddTechFromBody_DetectsMobX(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`import { makeAutoObservable } from "mobx";`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if _, ok := stateMgrSet["MobX"]; !ok {
+		t.Fatal("expected MobX state management detected")
+	}
+}
+
+func TestAddTechFromBody_DetectsTanStackQuery(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`import { useQuery, QueryClient } from "@tanstack/react-query";`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if _, ok := stateMgrSet["TanStack Query / SWR"]; !ok {
+		t.Fatal("expected TanStack Query / SWR state management detected")
+	}
+}
+
+func TestAddTechFromBody_DetectsSWR(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`import useSWR from "swr";`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if _, ok := stateMgrSet["TanStack Query / SWR"]; !ok {
+		t.Fatal("expected TanStack Query / SWR state management detected")
+	}
+}
+
+func TestAddTechFromBody_DetectsValtio(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`import { proxy } from "valtio";`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if _, ok := stateMgrSet["Valtio/Effector"]; !ok {
+		t.Fatal("expected Valtio/Effector state management detected")
+	}
+}
+
+func TestAddTechFromBody_SkipsNonStateManagement(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`const x = 1; function hello() { return "world"; }`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if len(stateMgrSet) > 0 {
+		t.Fatalf("expected no state management detected, got %d", len(stateMgrSet))
+	}
+}
+
+func TestAddTechFromBody_DetectsEffector(t *testing.T) {
+	techSet := make(map[string]struct{})
+	stateMgrSet := make(map[string]struct{})
+	var mu sync.Mutex
+
+	body := []byte(`import { createStore, createEvent } from "effector";`)
+	addTechFromBody("application/javascript", body, techSet, stateMgrSet, &mu)
+
+	if _, ok := stateMgrSet["Valtio/Effector"]; !ok {
+		t.Fatal("expected Valtio/Effector state management detected")
+	}
+}

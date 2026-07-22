@@ -36,6 +36,7 @@ const (
 	LeakTypeOpenRedirect  LeakType = "OPEN_REDIRECT"
 	LeakTypeInsecureForm  LeakType = "INSECURE_FORM"
 	LeakTypeVulnCDN       LeakType = "VULNERABLE_CDN_LIBRARY"
+	LeakTypeStorageLeak   LeakType = "STORAGE_SENSITIVE_DATA"
 )
 
 type Leak struct {
@@ -67,4 +68,5 @@ type TechInsight struct {
 	SitemapXML            string   `json:"sitemap_xml,omitempty"`
 	APISpecs              []string `json:"api_specs,omitempty"`
 	GraphQLIntrospection  string   `json:"graphql_introspection,omitempty"`
+	StateManagement       string   `json:"state_management,omitempty"`
 }

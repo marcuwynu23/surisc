@@ -43,7 +43,7 @@ The name combines **suri** (Tagalog: "examine" or "analyze") with **SC** for **s
 - **Scans response headers** — Checks every HTTP response header for API keys, bearer tokens, and credentials (x-api-key, Authorization, etc.)
 - **Ingests** — Fetches source map (`.map`) files and recursively scans their original source code for secrets
 - **Analyzes** — Shannon entropy scoring flags high-density strings that look like real credentials
-- **Audits frontend security** — Detects weak Content-Security-Policy, permissive CORS, missing HttpOnly/Secure/SameSite cookies, scripts without Subresource Integrity, XSS sinks (innerHTML, eval, document.write), open redirects, insecure HTTP forms, and known vulnerable CDN library versions
+- **Audits frontend security** — Detects weak Content-Security-Policy, permissive CORS, missing HttpOnly/Secure/SameSite cookies, scripts without Subresource Integrity, XSS sinks (innerHTML, eval, document.write), open redirects, insecure HTTP forms, client-side storage of JWTs & tokens, known vulnerable CDN library versions, and fingerprints state management libraries (Pinia, Zustand, Redux, Vuex, MobX, etc.)
 - **Discovers** — Routes from HTML, JS, JSON, `robots.txt`, and `sitemap.xml`; probes attack-surface paths
 - **Probes** — Detects GraphQL introspection endpoints, OpenAPI/Swagger spec files, and API documentation pages
 - **Filters** — Built-in false positive suppression ignores compilation artifacts, placeholder values, and standard library internals
