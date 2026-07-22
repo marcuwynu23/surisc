@@ -109,7 +109,9 @@
         <p>
           surisc is a <strong>memory-resident reconnaissance tool</strong> written in Go. It scrapes, parses, and
           analyzes JavaScript bundles from target URLs, hunting for leaked API keys, hardcoded credentials,
-          and exposed environment variables — all without writing a single byte to disk.
+          and exposed environment variables — all without writing a single byte to disk. It also audits
+          frontend security posture by inspecting CSP, CORS, cookies, response headers, and client-side
+          storage for misconfigurations and exposed secrets.
         </p>
         <p>
           Designed for security researchers and penetration testers, surisc operates entirely in RAM using

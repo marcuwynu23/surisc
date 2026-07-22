@@ -129,7 +129,7 @@
 <span class="cmd">surisc -u https://example.com -i routes</span>
 <span class="cmd">surisc -u https://example.com -i robots</span>
 <span class="cmd">surisc -u https://example.com -i sitemaps</span></code></pre>
-        <p><strong>New in this release:</strong> <code>-i</code> mode now automatically probes 10 OpenAPI/Swagger spec paths and detects references in JS bundles. It also tests common GraphQL endpoints for enabled introspection via a <code>__schema</code> query. Results appear in the webinfo table and routes section.</p>
+        <p><strong>New in v2.3.0:</strong> Frontend security auditing checks CSP, CORS, cookies, SRI, XSS, open redirect, insecure forms, and vulnerable CDN libraries. Response headers are also scanned for exposed API keys and secrets. Client-side storage references (localStorage, sessionStorage, IndexedDB) are inspected for stored tokens. Results appear in the webinfo table.</p>
       </section>
 
       <section>

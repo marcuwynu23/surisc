@@ -125,6 +125,8 @@
           <div class="item"><strong>Firebase Config Leak</strong><span>firebaseConfig/initializeApp with exposed apiKey</span></div>
           <div class="item"><strong>Supabase Config Leak</strong><span>supabaseUrl/supabaseKey variable assignments</span></div>
           <div class="item"><strong>Source Map Ingestion</strong><span>Recursively scans .map file original sources for secrets</span></div>
+          <div class="item"><strong>Client-side Storage Tokens</strong><span>Scans localStorage, sessionStorage, IndexedDB references for stored secrets</span></div>
+          <div class="item"><strong>Response Header API Keys</strong><span>Scans HTTP response headers for exposed API keys and secrets</span></div>
         </div>
       </section>
 
@@ -144,6 +146,8 @@
               references in JS bundles</span></div>
           <div class="item"><strong>GraphQL Introspection</strong><span>Queries /graphql endpoints for enabled
               introspection</span></div>
+          <div class="item"><strong>Frontend Security Audit</strong><span>CSP, CORS, SRI, XSS, open redirect, insecure forms, vulnerable CDN</span></div>
+          <div class="item"><strong>State Management Detection</strong><span>Identifies Redux, Zustand, Pinia, Vuex, and other client-side state libs</span></div>
         </div>
       </section>
 
