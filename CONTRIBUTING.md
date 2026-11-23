@@ -127,6 +127,10 @@ make linux && make deb
 
 All new features require tests. Aim for > 80% coverage on new code.
 
+Current baseline (2026-11-24, `make coverage`): 42.1% of statements overall;
+`cmd/surisc` 23.0% and `internal/scanner` 44.8%. New code should not lower the
+coverage of the packages it touches.
+
 ### Patterns
 
 **Unit tests** (`internal/scanner/*_test.go`):

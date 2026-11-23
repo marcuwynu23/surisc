@@ -20,3 +20,12 @@ jobs:
 
     - name: Run Tests
       run: make test
+
+    - name: Run go vet
+      run: make vet
+
+    - name: Check formatting
+      run: make fmt-check
+
+    - name: Measure coverage
+      run: make coverage

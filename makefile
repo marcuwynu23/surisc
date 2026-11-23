@@ -55,6 +55,23 @@ test:
 	go test ./...
 
 # ----------------------------
+# Static checks
+# ----------------------------
+vet:
+	@echo "Running go vet..."
+	go vet ./...
+
+fmt-check:
+	@echo "Checking gofmt..."
+	@test -z "$$(gofmt -l .)" || (echo "gofmt drift detected in:" && gofmt -l . && exit 1)
+
+coverage:
+	@echo "Measuring coverage..."
+	@mkdir -p $(DIST_DIR)
+	go test -coverprofile=$(DIST_DIR)/coverage.out ./...
+	go tool cover -func=$(DIST_DIR)/coverage.out
+
+# ----------------------------
 # FPM check
 # ----------------------------
 check-fpm:
@@ -67,4 +84,4 @@ clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf $(DIST_DIR)
 
-.PHONY: all exe linux installer-nsis deb test clean
+.PHONY: all exe linux installer-nsis deb test vet fmt-check coverage clean
