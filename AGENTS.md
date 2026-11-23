@@ -48,14 +48,15 @@ SuriSC is a Go DAST reconnaissance CLI (module `surisc`, `go.mod:1-5`) that scan
 - **Test gates:** run `make test` (full `go test ./...` suite) before the first change and after every change, plus `go vet ./...`, a gofmt check (`gofmt -l .` must be empty for touched files), and `go build ./...`; a failing test, a skipped test without a written reason, or a failing vet/build gate blocks completion. `tests/scanner_test.go:17` is the mock-server integration test and `internal/scanner/*_test.go` hold unit tests — both are part of the full suite, not optional subsets.
 - **Loop engineering:** Plan → Execute → Verify → Correct → Stop. Never declare success on the first pass; each correction re-enters the loop with the full gate set.
 - **Regression:** finish every task by re-running the full suite (`make test`), not only tests around touched code; record actual output.
-- **CI parity:** local `make test` matches `.github/workflows/test.yml:21-22` (Go 1.24.x, push/PR to main). Release builds use `go build -o ... cmd/surisc/main.go` (`.github/workflows/release.yml:53,71,77`); container builds are CI-only here and unverified locally. If local and CI commands differ, document both rather than assuming equivalence.
-- **Coverage/flaky policy:** `CONTRIBUTING.md:126-129` requires tests for new features and aims for >80% coverage on new code, but no CI threshold is enforced and no flaky-test policy is defined anywhere verified; never silently lower the aim, never skip a flaky test, and report flakes with the command and output for a human decision.
+- **CI parity:** local `make test`, `make vet`, `make fmt-check`, and `make coverage` match `.github/workflows/test.yml:21-31` (Go 1.24.x, push/PR to main). Release builds use `go build -o ... cmd/surisc/main.go` (`.github/workflows/release.yml:53,71,77`); container builds are CI-only here and unverified locally. If local and CI commands differ, document both rather than assuming equivalence.
+- **Coverage/flaky policy:** `CONTRIBUTING.md:126-132` requires tests for new features, aims for >80% coverage on new code, and records a baseline (42.1% overall, `cmd/surisc` 23.0%, `internal/scanner` 44.8% at `CONTRIBUTING.md:130`); no CI threshold is enforced and no flaky-test policy is defined anywhere verified. Never silently lower the aim, never skip a flaky test, and report flakes with the command and output for a human decision.
 - **Git delivery:** no implicit commit/push. Present a per-file plan with conventional messages, wait for explicit confirmation, stage only planned files, push, then watch triggered runs (`gh run watch <id> --exit-status`, `gh run view <id>`) to `success`; with no Actions, verify the remote ref with `git ls-remote origin refs/heads/<branch>` equal to local `HEAD`.
+- **Tracker hygiene:** when starting an item tracked in Project Surisc #19, set its Status to `In progress` (`47fc9ee4`) with `gh project item-edit --id <item-id> --project-id PVT_kwHOA7B5Z84BSPZy --field-id PVTSSF_lAHOA7B5Z84BSPZyzg_1VhQ --single-select-option-id 47fc9ee4`; when done, set Status to `Done` (`98236657`), add an evidence comment to the linked issue with `gh issue comment`, and verify with `gh project item-list 19 --owner marcuwynu23 --format json` and `gh issue view <n> --json state,stateReason`. Moving an item to `Done` auto-closes linked issues; do not assume a comment was posted by that transition, and use `gh issue close <n> --reason completed --comment ...` only if it is still open.
 
 ## Conventions
 
 - Go naming and layout: `camelCase` unexported / `PascalCase` exported, `snake_case.go` filenames, `*_test.go` beside code or under `tests/` (`CONTRIBUTING.md:96-100`).
-- Imports grouped standard library → third-party → internal (`CONTRIBUTING.md:102-105`); format with gofmt before committing, accepting that current files have known drift (`CONTRIBUTING.md:113-116`).
+- Imports grouped standard library → third-party → internal (`CONTRIBUTING.md:102-105`); `gofmt -l .` must be empty and CI enforces `make fmt-check` (`.github/workflows/test.yml:27`).
 - Return and wrap errors (`fmt.Errorf("context: %w", err)`); no panics except in `main()`; logging in the scanner only (`CONTRIBUTING.md:107-111`). Shared state in goroutines is guarded with `sync.Mutex` (`internal/scanner/scanner.go:98-106`, `CONTRIBUTING.md:118-122`).
 - Conventional Commits `<type>(<scope>): <description>` with scope such as `scanner`, `cli`, `models`, `docker`, `release`, `docs` (`CONTRIBUTING.md:181-222`), matching `feat`/`fix`/`docs`/`test`/`ci` history (`git log --oneline -10`).
 - Test fixtures are constructed from fragments, never literal secret values (`CONTRIBUTING.md:173-179`, `tests/scanner_test.go:22-46`).
@@ -69,12 +70,12 @@ SuriSC is a Go DAST reconnaissance CLI (module `surisc`, `go.mod:1-5`) that scan
 - `CONTRIBUTING.md` — coding standards, testing, commit and release conventions (`CONTRIBUTING.md:94-128`, `CONTRIBUTING.md:181-283`).
 - `SECURITY.md` — supported versions, responsible disclosure, safe scanning rules (`SECURITY.md:3-49`).
 - `CODE_OF_CONDUCT.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.git-rndocs.yaml` — community, PR, and release-note conventions.
-- `CHANGELOG.md`, `docs/releases/**` — historical release notes; `CHANGELOG.md` is stale relative to v2.3.0 (see Finding 2).
-- `PLAN.md` / `ROADMAP.md` — absent as of 2026-11-24; do not invent or create them without instruction. If added later, reference them here instead of duplicating their content.
+- `CHANGELOG.md`, `docs/releases/**` — historical release notes; `CHANGELOG.md:7` now covers through v2.3.0.
+- `ROADMAP.md` — tracked ranked queue and board mapping (`ROADMAP.md:1`, commit `fbc544b`); `PLAN.md` is absent, so do not invent it. Reference the roadmap instead of duplicating its content.
 
 ## Known priorities (from gh issues)
 
-- None open: `gh issue list --state open --limit 50 --json number,title,labels,milestone,updatedAt` returned `[]` on 2026-11-24; issues #1-#3 are closed and are not active priorities. No labels or milestones were available to rank.
+- None open: issues #6-#9 were closed as completed on 2026-11-24 after their project items were moved to `Done`; issues #1-#3 are earlier closed history. Re-run `gh issue list --state open --limit 50 --json number,title,labels,milestone,updatedAt` before relying on this.
 
 ## Verification loop
 
@@ -82,7 +83,7 @@ SuriSC is a Go DAST reconnaissance CLI (module `surisc`, `go.mod:1-5`) that scan
 2. **Execute** — make only the planned changes; derive every claim from real file, command, `gh`, or manifest output.
 3. **Verify** — run `make test`, `go vet ./...`, `gofmt -l .`, `go build ./...`, and any CI-parity build; read actual output.
 4. **Correct** — fix every failed gate, including gofmt drift in touched files, then re-run the entire loop.
-5. **Stop condition** — full suite and all gates green with output recorded, final regression done, working tree clean, planned commits pushed, and every triggered run concluded `success` (or no CI plus an `ls-remote` match). Otherwise report exactly what remains pending or failed.
+5. **Stop condition** — full suite and all gates green with output recorded, final regression done, working tree clean, planned commits pushed, every triggered run concluded `success` (or no CI plus an `ls-remote` match), and every tracked item moved to `Done` with its issue closed/commented and verified via `gh`. Otherwise report exactly what remains pending or failed.
 
 ## Never do
 
