@@ -31,14 +31,15 @@ SuriSC is a Go DAST reconnaissance CLI (module `surisc`, `go.mod:1-5`) that scan
 
 | Purpose | Command | Verified |
 | --- | --- | --- |
-| install/download modules | `go mod download` | yes (this session, exit 0) |
-| test (CI parity with `test.yml:22`) | `make test` | yes (this session; scanner + integration packages pass) |
-| test (direct) | `go test ./...` | yes (this session; `internal/scanner` 0.425s, `tests` 22.060s) |
-| vet | `go vet ./...` | yes (this session, exit 0) |
-| format check | `gofmt -l .` | yes (this session; reports drift — see Project status) |
-| build all packages | `go build ./...` | yes (this session, exit 0) |
-| build CLI binary | `go build -o "$env:TEMP\surisc-check.exe" cmd/surisc/main.go` | yes (this session, exit 0; temp output removed) |
-| module integrity | `go mod verify` | yes (this session, "all modules verified") |
+| install/download modules | `go mod download` | yes (earlier session, exit 0) |
+| test (CI parity with `test.yml:21`) | `make test` | yes (re-run after final commit; all packages pass) |
+| test (direct) | `go test ./...` | yes (re-run after final commit) |
+| vet | `make vet` / `go vet ./...` | yes (re-run after final commit, exit 0) |
+| format check | `make fmt-check` / `gofmt -l .` | yes (empty output) |
+| coverage | `make coverage` | yes (42.1% overall; `dist/coverage.out` generated, gitignored) |
+| build all packages | `go build ./...` | yes (re-run after final commit, exit 0) |
+| build CLI binary | `go build -o "$env:TEMP\surisc-check.exe" cmd/surisc/main.go` | yes (earlier session, exit 0; temp output removed) |
+| module integrity | `go mod verify` | yes (re-run after final commit, "all modules verified") |
 | container build | local equivalent of the `docker/build-push-action@v5` step in `package-container.yml:47-55` | unverified (not executed this session) |
 
 ## Testing & loop engineering (mandatory)
