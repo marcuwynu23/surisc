@@ -248,6 +248,8 @@ SuriSC Completed. Results:
 
 ## CI/CD Integration
 
+SuriSC exits `0` when no leaks are found, `2` when leaks are found, and `1` on runtime or usage errors, so it can gate a pipeline without parsing output. See [Exit Codes](USER-GUIDE.md#exit-codes) for details.
+
 ### GitHub Actions (Secret Scan)
 
 ```yaml

@@ -1,33 +1,52 @@
 package main
 
 import (
-	"encoding/xml"
 	"encoding/json"
+	"encoding/xml"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
 	"surisc/internal/scanner"
 )
 
+const (
+	exitOK       = 0
+	exitError    = 1
+	exitFindings = 2
+)
+
 func main() {
-	cleanArgs, informative, informativeScope, err := parseInformativeArgs(os.Args[1:])
+	os.Exit(run(os.Args[1:]))
+}
+
+func run(args []string) int {
+	cleanArgs, informative, informativeScope, err := parseInformativeArgs(args)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		return exitError
 	}
 
-	targetURL := flag.String("u", "", "Target URL to scan")
-	outputFormat := flag.String("o", "hud", "Output format (hud|json)")
-	flag.CommandLine.Parse(cleanArgs)
+	flags := flag.NewFlagSet("surisc", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	targetURL := flags.String("u", "", "Target URL to scan")
+	outputFormat := flags.String("o", "hud", "Output format (hud|json)")
+	if err := flags.Parse(cleanArgs); err != nil {
+		if err == flag.ErrHelp {
+			return exitOK
+		}
+		return exitError
+	}
 
 	if *targetURL == "" {
-		log.Fatal("Please provide a target URL using the -u flag.")
+		fmt.Fprintln(os.Stderr, "Please provide a target URL using the -u flag.")
+		return exitError
 	}
 
 	if err := scanner.ValidateTargetReachable(*targetURL); err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		return exitError
 	}
 
 	leaks, insight := scanner.RunScan(*targetURL, informative)
@@ -36,13 +55,15 @@ func main() {
 		if informative {
 			b, err := json.MarshalIndent(insight, "", "  ")
 			if err != nil {
-				log.Fatalf("Failed to marshal json: %v", err)
+				fmt.Fprintf(os.Stderr, "Failed to marshal json: %v\n", err)
+				return exitError
 			}
 			fmt.Println(string(b))
 		} else {
 			b, err := json.MarshalIndent(leaks, "", "  ")
 			if err != nil {
-				log.Fatalf("Failed to marshal json: %v", err)
+				fmt.Fprintf(os.Stderr, "Failed to marshal json: %v\n", err)
+				return exitError
 			}
 			fmt.Println(string(b))
 		}
@@ -121,7 +142,7 @@ func main() {
 				fmt.Println("- No technology insights detected.")
 			}
 			fmt.Println(strings.Repeat("-", 68))
-			return
+			return exitOK
 		}
 
 		fmt.Println("\n🛰️  Surisc Completed. Results:")
@@ -135,6 +156,15 @@ func main() {
 			fmt.Println(strings.Repeat("-", 68))
 		}
 	}
+
+	return exitCodeFor(len(leaks))
+}
+
+func exitCodeFor(findings int) int {
+	if findings > 0 {
+		return exitFindings
+	}
+	return exitOK
 }
 
 func parseInformativeArgs(args []string) ([]string, bool, string, error) {

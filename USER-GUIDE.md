@@ -348,6 +348,28 @@ A: Either the target has no discoverable routes, or all candidate routes were fi
 
 ## CI/CD Integration
 
+### Exit Codes
+
+| Code | Meaning |
+| ---- | ------- |
+| `0`  | Scan completed; no leaks found |
+| `1`  | Runtime or usage error (invalid flags, unreachable target, output failure) |
+| `2`  | Scan completed; one or more leaks found |
+
+Informative scans (`-i`) report target observations rather than leaks and exit `0` on success.
+
+Use the exit code to gate a pipeline:
+
+```bash
+surisc -u "$TARGET_URL" -o json > surisc-report.json
+code=$?
+case "$code" in
+  0) echo "No leaks found" ;;
+  2) echo "Leaks found"; exit 1 ;;
+  *) echo "SuriSC failed with exit code $code"; exit "$code" ;;
+esac
+```
+
 ### GitHub Actions — Weekly Secret Scan
 
 ```yaml
@@ -399,10 +421,18 @@ Run as a pre-deployment step on each staging deploy:
 ```bash
 #!/usr/bin/env bash
 TARGET="$1"
-surisc -u "$TARGET" -o json | jq '.[] | select(.gravity_score >= 8.0)'
-if [ $? -eq 0 ]; then
-  echo "High-severity secrets found! Blocking deploy."
+surisc -u "$TARGET" -o json > surisc-report.json
+code=$?
+if [ "$code" -eq 0 ]; then
+  echo "No leaks found."
+  exit 0
+elif [ "$code" -eq 2 ]; then
+  echo "Leaks found! Blocking deploy."
+  jq '.[] | select(.gravity_score >= 8.0)' surisc-report.json
   exit 1
+else
+  echo "SuriSC failed with exit code $code"
+  exit "$code"
 fi
 ```
 
