@@ -6,7 +6,7 @@ NSIS_OUTPUT := $(DIST_DIR)/surisc-setup.exe
 NSIS_VERSION := 1.0.0
 
 DEB_NAME := surisc
-DEB_VERSION ?= 1.0.0
+DEB_VERSION ?= $(NSIS_VERSION)
 
 all: exe installer-nsis
 
@@ -33,7 +33,7 @@ installer-nsis: exe
 	@echo "Building NSIS installer..."
 	@makensis \
 	  -DOUTPUT_FILE=$(NSIS_OUTPUT) \
-	  -DPRODUCT_VERSION=$(VERSION) \
+	  -DPRODUCT_VERSION=$(NSIS_VERSION) \
 	  $(NSIS_SCRIPT)
 
 # ----------------------------
