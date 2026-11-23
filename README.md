@@ -285,7 +285,7 @@ surisc-scan:
 
 | Tool            | Version | Purpose                      |
 | --------------- | ------- | ---------------------------- |
-| Go              | 1.24+   | Compiler                     |
+| Go              | 1.25+   | Compiler                     |
 | Make            | Any     | Build automation             |
 | makensis (NSIS) | Any     | Windows installer (optional) |
 | fpm             | Any     | Debian packaging (optional)  |

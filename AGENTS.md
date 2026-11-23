@@ -14,13 +14,14 @@ SuriSC is a Go DAST reconnaissance CLI (module `surisc`, `go.mod:1-5`) that scan
 3. Resolved: `makefile:6,9,36` now use `NSIS_VERSION` as the canonical version; `.github/workflows/release.yml:56` overrides it at release time.
 4. `make all` was not executed this session (unverified on this Windows host; `makefile:19,27` use POSIX `GOOS=... GOARCH=... go build` syntax).
 5. Scheduled CodeQL runs appear in `gh run list`, but no CodeQL workflow file exists under `.github/workflows/**` (only `test.yml`, `release.yml`, `package-container.yml`); their source is unverified locally.
+6. Resolved by this delivery: dependabot merge `88c618f` raised `go.mod` to `go 1.25.0` (`x/net v0.55`, `x/text v0.37`) while `Dockerfile:2` and both Go workflows stayed on 1.24; Docker run `45224473806` failed at `6bd29a6` with `go.mod requires go >= 1.25.0`. `Dockerfile:2`, `.github/workflows/test.yml:19`, `.github/workflows/release.yml:25`, `README.md:288`, `CONTRIBUTING.md:13`, and this file now target 1.25; local `docker build` and all Go gates pass.
 
 ## Environment & toolchain
 
 | Tool | Version | Evidence |
 | --- | --- | --- |
 | Go (installed) | go1.26.1 windows/amd64 | `go version` |
-| Go (module / CI target) | 1.24.0 / 1.24.x / 1.24 | `go.mod:3`, `.github/workflows/test.yml:19`, `.github/workflows/release.yml:25` |
+| Go (module / CI target) | 1.25.0 / 1.25.x / 1.25 | `go.mod:3`, `.github/workflows/test.yml:19`, `.github/workflows/release.yml:25` |
 | gocolly/colly/v2 | v2.3.0 | `go.mod:5` |
 | GNU Make | 3.81 | `make --version` |
 | Docker (server) | 27.5.1 | `docker version --format '{{.Server.Version}}'` |
@@ -40,7 +41,7 @@ SuriSC is a Go DAST reconnaissance CLI (module `surisc`, `go.mod:1-5`) that scan
 | build all packages | `go build ./...` | yes (re-run after final commit, exit 0) |
 | build CLI binary | `go build -o "$env:TEMP\surisc-check.exe" cmd/surisc/main.go` | yes (earlier session, exit 0; temp output removed) |
 | module integrity | `go mod verify` | yes (re-run after final commit, "all modules verified") |
-| container build | local equivalent of the `docker/build-push-action@v5` step in `package-container.yml:47-55` | unverified (not executed this session) |
+| container build | `docker build -t surisc-go125-check .` (Dockerfile builder) | yes (exit 0 with `golang:1.25-alpine`; image `surisc-go125-check` created locally) |
 
 ## Testing & loop engineering (mandatory)
 
@@ -48,7 +49,7 @@ SuriSC is a Go DAST reconnaissance CLI (module `surisc`, `go.mod:1-5`) that scan
 - **Test gates:** run `make test` (full `go test ./...` suite) before the first change and after every change, plus `go vet ./...`, a gofmt check (`gofmt -l .` must be empty for touched files), and `go build ./...`; a failing test, a skipped test without a written reason, or a failing vet/build gate blocks completion. `tests/scanner_test.go:17` is the mock-server integration test and `internal/scanner/*_test.go` hold unit tests — both are part of the full suite, not optional subsets.
 - **Loop engineering:** Plan → Execute → Verify → Correct → Stop. Never declare success on the first pass; each correction re-enters the loop with the full gate set.
 - **Regression:** finish every task by re-running the full suite (`make test`), not only tests around touched code; record actual output.
-- **CI parity:** local `make test`, `make vet`, `make fmt-check`, and `make coverage` match `.github/workflows/test.yml:21-31` (Go 1.24.x, push/PR to main). Release builds use `go build -o ... cmd/surisc/main.go` (`.github/workflows/release.yml:53,71,77`); container builds are CI-only here and unverified locally. If local and CI commands differ, document both rather than assuming equivalence.
+- **CI parity:** local `make test`, `make vet`, `make fmt-check`, and `make coverage` match `.github/workflows/test.yml:21-31` (Go 1.25.x, push/PR to main). Release builds use `go build -o ... cmd/surisc/main.go` (`.github/workflows/release.yml:53,71,77`); container builds are also verified locally with `docker build -t surisc-go125-check .`. If local and CI commands differ, document both rather than assuming equivalence.
 - **Coverage/flaky policy:** `CONTRIBUTING.md:126-132` requires tests for new features, aims for >80% coverage on new code, and records a baseline (42.1% overall, `cmd/surisc` 23.0%, `internal/scanner` 44.8% at `CONTRIBUTING.md:130`); no CI threshold is enforced and no flaky-test policy is defined anywhere verified. Never silently lower the aim, never skip a flaky test, and report flakes with the command and output for a human decision.
 - **Git delivery:** no implicit commit/push. Present a per-file plan with conventional messages, wait for explicit confirmation, stage only planned files, push, then watch triggered runs (`gh run watch <id> --exit-status`, `gh run view <id>`) to `success`; with no Actions, verify the remote ref with `git ls-remote origin refs/heads/<branch>` equal to local `HEAD`.
 - **Tracker hygiene:** when starting an item tracked in Project Surisc #19, set its Status to `In progress` (`47fc9ee4`) with `gh project item-edit --id <item-id> --project-id PVT_kwHOA7B5Z84BSPZy --field-id PVTSSF_lAHOA7B5Z84BSPZyzg_1VhQ --single-select-option-id 47fc9ee4`; when done, set Status to `Done` (`98236657`), add an evidence comment to the linked issue with `gh issue comment`, and verify with `gh project item-list 19 --owner marcuwynu23 --format json` and `gh issue view <n> --json state,stateReason`. Moving an item to `Done` auto-closes linked issues; do not assume a comment was posted by that transition, and use `gh issue close <n> --reason completed --comment ...` only if it is still open.

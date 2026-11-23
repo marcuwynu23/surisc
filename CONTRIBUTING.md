@@ -10,7 +10,7 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 | Tool | Version | Purpose |
 |---|---|---|
-| Go | 1.24+ | Compiler and toolchain |
+| Go | 1.25+ | Compiler and toolchain |
 | Make | Any | Task runner for builds, tests |
 | Git | Any | Version control |
 | NSIS (makensis) | Any | Windows installer generation (optional) |
