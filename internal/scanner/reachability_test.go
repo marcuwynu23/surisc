@@ -40,4 +40,3 @@ func TestValidateTargetReachable_Status5xxErrors(t *testing.T) {
 		t.Fatalf("expected error for non-active 5xx target")
 	}
 }
-

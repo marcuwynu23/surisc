@@ -462,12 +462,12 @@ func TestIsLikelyWordPressBody(t *testing.T) {
 
 func TestIsLikelyFallbackResponse(t *testing.T) {
 	tests := []struct {
-		name       string
+		name        string
 		contentType string
-		sig        string
-		homeSig    string
-		missingSig string
-		want       bool
+		sig         string
+		homeSig     string
+		missingSig  string
+		want        bool
 	}{
 		{"matches home", "text/html", "abc123", "abc123", "", true},
 		{"matches missing", "text/html", "abc123", "", "abc123", true},
@@ -888,9 +888,9 @@ func TestHasCloudflarePagesHeaderSignal(t *testing.T) {
 		{
 			"origin server fingerprint overrides",
 			http.Header{
-				"Server":        {"cloudflare"},
-				"Cf-Ray":        {"abc123-LAX"},
-				"X-Powered-By":  {"PHP/7.4"},
+				"Server":       {"cloudflare"},
+				"Cf-Ray":       {"abc123-LAX"},
+				"X-Powered-By": {"PHP/7.4"},
 			},
 			false,
 		},

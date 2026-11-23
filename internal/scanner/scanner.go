@@ -938,7 +938,7 @@ func mergeCookieInsights(cookies []*http.Cookie, insight *models.TechInsight) {
 			jwtSet["JWT-like cookie name: "+c.Name] = struct{}{}
 		}
 		if rxJWTLike.MatchString(c.Value) {
-			jwtSet["JWT-like cookie value: " + c.Name] = struct{}{}
+			jwtSet["JWT-like cookie value: "+c.Name] = struct{}{}
 		}
 	}
 
@@ -1822,7 +1822,7 @@ func isLikelyNonSecretHighEntropy(secret string) bool {
 
 func processSourceMaps(leaks *[]models.Leak, leaksMutex *sync.Mutex) {
 	var mapEntries []struct {
-		url      string
+		url       string
 		sourceURL string
 	}
 
@@ -1834,7 +1834,7 @@ func processSourceMaps(leaks *[]models.Leak, leaksMutex *sync.Mutex) {
 		u := extractMapURL(leak.Snippet, leak.SourceURL)
 		if u != "" {
 			mapEntries = append(mapEntries, struct {
-				url      string
+				url       string
 				sourceURL string
 			}{u, leak.SourceURL})
 		}
@@ -1988,10 +1988,10 @@ func mergeValidatedContentRoutes(base string, routeSet map[string]struct{}, cand
 	missingSig := normalizedResponseSignature(missingCT, missingBody, paths)
 
 	type routeValidationResult struct {
-		path       string
-		statusCode int
+		path        string
+		statusCode  int
 		contentType string
-		body       []byte
+		body        []byte
 	}
 	workers := boundedWorkerCount(len(paths))
 	jobs := make(chan string, len(paths))
