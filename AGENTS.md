@@ -1,17 +1,17 @@
 # AGENTS.md — surisc
-> Generated: 2026-11-24 · by project-aware-agent-maker · evidence-based, re-run before trusting
+> Updated: 2026-11-24 · by project-aware-agent-maker · evidence-based, re-run before trusting
 
 ## Project status
 
-SuriSC is a Go DAST reconnaissance CLI (module `surisc`, `go.mod:1-5`) that scans live frontends for leaked secrets and audits frontend security; the CLI entrypoint is `cmd/surisc/main.go:15`, with flag parsing at `cmd/surisc/main.go:140`, the scan engine at `internal/scanner/scanner.go:70`, and findings models at `internal/models/models.go:42-72`. Local quality gates pass (`make test`, `go test ./...`, `go vet ./...`, `go build ./...`, `go mod verify`), but `gofmt -l .` reports drift: on this Windows checkout git converts LF to CRLF (`core.autocrlf=true`; `git ls-files --eol cmd/surisc/main.go` → `i/lf w/crlf`), and even LF-normalized checks still flag 5 files, e.g. import order at `cmd/surisc/main.go:4-5`, while `CONTRIBUTING.md:115` and `.github/PULL_REQUEST_TEMPLATE.md:20` require clean gofmt. Docs describe v2.3.0 (`docs/releases/v2.3.0/RELEASE-NOTES.md:3`, `README.md:11-16`), but `CHANGELOG.md:7` stops at v2.1.0, and no `PLAN.md`, `ROADMAP.md`, or pre-existing `AGENTS.md` exists in the root (verified with `Test-Path`).
+SuriSC is a Go DAST reconnaissance CLI (module `surisc`, `go.mod:1-5`) that scans live frontends for leaked secrets and audits frontend security; the CLI entrypoint is `cmd/surisc/main.go:20`, flag parsing starts at `cmd/surisc/main.go:31`, the scan engine is at `internal/scanner/scanner.go:70`, and findings models are at `internal/models/models.go:42-72`. Local quality gates pass (`make test`, `make vet`, `gofmt -l .` empty, `make coverage`, `go build ./...`, `go mod verify`), and CI runs tests, vet, format check, and coverage (`.github/workflows/test.yml:21-31`). `CHANGELOG.md:7` covers v2.3.0, `makefile:36` feeds `NSIS_VERSION` to `-DPRODUCT_VERSION`, and the CLI exit-code contract is `0/1/2` (`cmd/surisc/main.go:15-19`, `:163-167`). `ROADMAP.md` is tracked (commit `fbc544b`); `PLAN.md` is still absent.
 
-- CI: green — `gh run list --limit 50 --json ...` returned only `completed`/`success` runs: Test 10, Create and publish a Docker image 11, Release 1, CodeQL 28; no failed run required diagnosis. No run was triggered or watched by this authoring session, so push-time status remains unverified until an actual push.
+- CI: green — the push of `d2ea72b` triggered Test, Docker, CodeQL/Push on main, and go_modules runs; all completed `success` and were watched with `gh run watch <id> --exit-status`. GitHub reported 1 moderate Dependabot alert on the default branch in the push output; its details were not inspected here.
 
 ### Findings / open questions (do not edit these files to resolve silently)
 
-1. Format drift: 5 of 8 Go files fail LF-normalized gofmt (e.g. `cmd/surisc/main.go:4-5`, `internal/models/models.go:26` alignment); PR checklist requires clean gofmt (`.github/PULL_REQUEST_TEMPLATE.md:20`). Ask before running `go fmt ./...` as a separate change.
-2. Stale history: `CHANGELOG.md:7` ends at v2.1.0 while `docs/releases/v2.3.0/RELEASE-NOTES.md:3` and recent commits describe v2.3.0.
-3. Version wiring mismatch: `makefile:6` defines `NSIS_VERSION`, `makefile:34-37` passes `-DPRODUCT_VERSION=$(VERSION)` (undefined), and `.github/workflows/release.yml:56` overrides `NSIS_VERSION` — confirm intended variable before touching installer builds.
+1. Resolved: gofmt drift was cleaned in `7da922b`; `gofmt -l .` is empty and CI enforces `make fmt-check` (`.github/workflows/test.yml:27`).
+2. Resolved: `CHANGELOG.md:7` now covers through v2.3.0 via `auto-changelog` (commit `75eef63`).
+3. Resolved: `makefile:6,9,36` now use `NSIS_VERSION` as the canonical version; `.github/workflows/release.yml:56` overrides it at release time.
 4. `make all` was not executed this session (unverified on this Windows host; `makefile:19,27` use POSIX `GOOS=... GOARCH=... go build` syntax).
 5. Scheduled CodeQL runs appear in `gh run list`, but no CodeQL workflow file exists under `.github/workflows/**` (only `test.yml`, `release.yml`, `package-container.yml`); their source is unverified locally.
 
